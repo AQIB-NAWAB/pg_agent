@@ -88,4 +88,3 @@ elif [ "$MODE" = "validate_suite" ]; then
 else
     echo "Error: Invalid mode specified."
     exit 1
-fi

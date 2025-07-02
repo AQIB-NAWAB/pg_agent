@@ -23,8 +23,9 @@ from .evaluation_runner import (
     evaluation_runner_node,
 )
 # --- MERGED IMPORTS ---
-from .edge_case_suggester import graph as edge_case_suggester_graph # Your change
-from .solution_validator_graph import get_solution_validator_graph # Incoming change
+# This section now includes the imports from both branches.
+from .edge_case_suggester import graph as edge_case_suggester_graph
+from .solution_validator_graph import get_solution_validator_graph
 
 
 __all__ = [
@@ -45,6 +46,7 @@ __all__ = [
     "evaluation_runner_node",
     "run_evaluation",
     # --- MERGED __all__ LIST ---
-    "edge_case_suggester_graph", # Your change
-    "get_solution_validator_graph", # Incoming change
+    # This section now includes the exports from both branches.
+    "edge_case_suggester_graph",
+    "get_solution_validator_graph",
 ]

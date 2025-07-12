@@ -8,13 +8,7 @@ import tempfile
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from .schemas import TestCaseGeneratorState
-
-def _open_in_editor(file_path: Path):
-    """Opens a file in the default text editor."""
-    editor = os.environ.get('EDITOR', 'notepad' if os.name == 'nt' else 'vim')
-    print(f"Opening {file_path.name} with '{editor}' for your review...")
-    # Use shell=True for Windows compatibility with paths that might have spaces
-    subprocess.run(f'"{editor}" "{file_path}"', shell=True, check=True)
+from ..utils.cli_utils import open_in_editor as _open_in_editor
 
 def _extract_cpp_code(response_content: str) -> str:
     """Parses the LLM's response to extract only the C++ code."""

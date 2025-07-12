@@ -9,7 +9,7 @@ from pathlib import Path
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 import questionary
-
+from ..utils.cli_utils import open_in_editor
 from .schemas import NovelProblemState
 
 def get_llm_client():
@@ -27,32 +27,6 @@ def _parse_test_cases(response: str) -> list[tuple[str, str]]:
         if input_match and output_match:
             test_cases.append((input_match.group(1).strip(), output_match.group(1).strip()))
     return test_cases
-
-def _get_user_feedback_from_editor() -> str:
-    """Opens a temporary file in the default text editor and returns the user's input."""
-    editor = os.environ.get('EDITOR', 'notepad' if os.name == 'nt' else 'vim')
-    initial_content = "# Please enter your feedback below. Save and close this file to continue.\n" \
-                      "# To accept the current version and generate test cases, save and close this file without adding any other text.\n"
-    
-    with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix=".txt", encoding="utf-8") as tf:
-        feedback_file_path = tf.name
-        tf.write(initial_content)
-    
-    print(f"Opening feedback file with '{editor}'...")
-    try:
-        subprocess.run([editor, feedback_file_path], check=True)
-    except Exception as e:
-        print(f"\nError opening editor: {e}. Please manually open and edit the file.")
-        print(f"Feedback file path: {feedback_file_path}")
-        input("Press Enter to continue after you have saved and closed the file...")
-
-    feedback_content = Path(feedback_file_path).read_text(encoding="utf-8")
-    os.unlink(feedback_file_path)
-    
-    lines = [line for line in feedback_content.splitlines() if not line.strip().startswith('#')]
-    return "\n".join(lines).strip()
-
-# --- Node Definitions ---
 
 def interactive_setup_node(state: NovelProblemState) -> dict:
     """Interactively asks the user for the generation strategy and gathers inputs."""
@@ -105,8 +79,15 @@ def interactive_setup_node(state: NovelProblemState) -> dict:
         topics = questionary.text("Please enter the topics, separated by commas:").ask()
 
     elif "Your Own Idea" in strategy:
-        user_prompt = _get_user_feedback_from_editor()
-        if not user_prompt:
+        with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix=".txt", encoding="utf-8") as tf:
+            feedback_file_path = Path(tf.name)
+            tf.write("# Please enter your detailed problem idea or context here.\n# You can copy-paste content from other files.\n# Save and close this file to continue.\n")
+        
+        open_in_editor(feedback_file_path)
+        user_prompt = feedback_file_path.read_text(encoding="utf-8")
+        os.unlink(feedback_file_path)
+
+        if not user_prompt.strip():
             print("No idea provided. Aborting.")
             raise KeyboardInterrupt
 
@@ -141,7 +122,17 @@ def interactive_feedback_node(state: NovelProblemState) -> dict:
     problem_path.write_text(state['problem_statement'], encoding="utf-8")
     print(f"The latest version of the problem has been saved to:\n{problem_path.resolve()}")
 
-    human_feedback = _get_user_feedback_from_editor()
+    with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix=".txt", encoding="utf-8") as tf:
+        feedback_file_path = Path(tf.name)
+        tf.write("# Please enter your feedback below. Save and close this file to continue.\n# To accept the current version and generate test cases, save and close this file without adding any other text.\n")
+    
+    open_in_editor(feedback_file_path)
+
+    feedback_content = feedback_file_path.read_text(encoding="utf-8")
+    os.unlink(feedback_file_path)
+    
+    lines = [line for line in feedback_content.splitlines() if not line.strip().startswith('#')]
+    human_feedback = "\n".join(lines).strip()
     
     if human_feedback:
         print("--- Feedback received. Preparing to refine problem statement. ---")

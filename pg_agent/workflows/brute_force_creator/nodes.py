@@ -11,13 +11,8 @@ from langchain_openai import ChatOpenAI
 # --- THIS IS THE FIX ---
 # Import the correct, existing sandbox function
 from ...pipeline.sandbox.sandbox_utils import run_single_test
+from ..utils.cli_utils import open_in_editor
 from .schemas import BruteForceState
-
-def _open_in_editor(file_path: Path):
-    """Opens a file in the default text editor."""
-    editor = os.environ.get('EDITOR', 'notepad' if os.name == 'nt' else 'vim')
-    print(f"Opening {file_path.name} with '{editor}' for your review...")
-    subprocess.run([editor, str(file_path)], check=True)
 
 def _extract_cpp_code(response_content: str) -> str:
     match = re.search(r'```(?:cpp)?\s*([\s\S]+?)\s*```', response_content)
@@ -30,7 +25,6 @@ def get_llm_client():
     return ChatOpenAI(model="o4-mini", api_key=api_key, max_tokens=8192)
 
 # --- Node Definitions ---
-
 def load_problem_node(state: BruteForceState) -> dict:
     """Loads the problem statement and example test cases from the user's directory."""
     print(f"--- Loading problem from: {state['problem_dir_path']} ---")
@@ -60,6 +54,31 @@ def gen_bruteforce_node(state: BruteForceState) -> dict:
     response = chain.invoke({"problem_statement": state["problem_statement"]})
     return {"bruteforce_code": _extract_cpp_code(response.content)}
 
+def interactive_review_node(state: BruteForceState) -> dict:
+    """Optionally allows the user to review and edit the generated code."""
+    print("\n" + "="*60)
+    wants_to_review = questionary.confirm(
+        "A bruteforce solution has been generated. Would you like to review or edit it before testing?",
+        default=False,
+        qmark="?"
+    ).ask()
+    
+    if not wants_to_review:
+        print("--- Skipping review. Proceeding with AI-generated code. ---")
+        return {}
+
+    with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix=".cpp", encoding="utf-8") as tf:
+        temp_code_path = Path(tf.name)
+        tf.write(state["bruteforce_code"])
+    
+    open_in_editor(temp_code_path)
+    
+    modified_code = temp_code_path.read_text(encoding="utf-8")
+    os.unlink(temp_code_path)
+    
+    print("--- Code updated with your changes. ---")
+    return {"bruteforce_code": modified_code}
+
 def test_bruteforce_on_examples_node(state: BruteForceState) -> dict:
     """Tests the current bruteforce code against all loaded example cases."""
     print("--- Testing bruteforce against examples ---")
@@ -71,8 +90,6 @@ def test_bruteforce_on_examples_node(state: BruteForceState) -> dict:
     for i, example in enumerate(state["example_test_cases"]):
         print(f"  Running example #{i+1} ({example['name']})...")
         
-        # --- THIS IS THE FIX ---
-        # Use the correct sandbox function: run_single_test
         passed, actual_output = run_single_test(
             solution_code=state["bruteforce_code"],
             input_data=example["input"]
@@ -80,8 +97,6 @@ def test_bruteforce_on_examples_node(state: BruteForceState) -> dict:
         
         actual_output_stripped = actual_output.strip()
 
-        # The run_single_test function doesn't have a timeout feature,
-        # so we only check for correctness.
         if not passed or actual_output_stripped != example["output"]:
             failures.append({
                 "example_number": i + 1, "input": example["input"],
@@ -108,33 +123,6 @@ def refine_bruteforce_node(state: BruteForceState) -> dict:
         "test_failures": json.dumps(state["test_failures"], indent=2),
     })
     return {"bruteforce_code": _extract_cpp_code(response.content)}
-
-# --- NEW: Node for optional human review ---
-def interactive_review_node(state: BruteForceState) -> dict:
-    """Optionally allows the user to review and edit the generated code."""
-    print("\n" + "="*60)
-    wants_to_review = questionary.confirm(
-        "A bruteforce solution has been generated. Would you like to review or edit it before testing?",
-        default=False,
-        qmark="?"
-    ).ask()
-    
-    if not wants_to_review:
-        print("--- Skipping review. Proceeding with AI-generated code. ---")
-        return {}
-
-    with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix=".cpp", encoding="utf-8") as tf:
-        temp_code_path = Path(tf.name)
-        tf.write(state["bruteforce_code"])
-    
-    _open_in_editor(temp_code_path)
-    
-    # Read the potentially modified code back
-    modified_code = temp_code_path.read_text(encoding="utf-8")
-    os.unlink(temp_code_path)
-    
-    print("--- Code updated with your changes. ---")
-    return {"bruteforce_code": modified_code}
 
 def save_and_version_node(state: BruteForceState) -> dict:
     """Saves the final correct code to the automation hub inside the problem directory."""

@@ -22,7 +22,12 @@ from .evaluation_runner import (
     run_evaluation,
     evaluation_runner_node,
 )
-from .edge_case_suggester import graph as edge_case_suggester_graph  # noqa: F401
+# --- MERGED IMPORTS ---
+# This section now includes the imports from both branches.
+from .edge_case_suggester import graph as edge_case_suggester_graph
+# from .solution_validator_graph import get_solution_validator_graph
+
+
 
 __all__ = [
     "select_topics",
@@ -41,5 +46,9 @@ __all__ = [
     "generate_evaluation_code",
     "evaluation_runner_node",
     "run_evaluation",
+    # --- MERGED __all__ LIST ---
+    # This section now includes the exports from both branches.
     "edge_case_suggester_graph",
+    "get_solution_validator_graph"
 ]
+

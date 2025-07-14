@@ -1,81 +1,65 @@
-# Problem Statement: Prime Hash
+```markdown
+## Problem Statement: Hashing Secrets
 
-In the world of cryptography, hashing is a fundamental concept that involves transforming input data into a fixed-size string of characters, which is typically a sequence of numbers. In this problem, you are tasked with creating a unique hash for a sequence of numbers using prime numbers and mathematical transformations.
+In a distant land, a group of wizards is trying to secure their magical spells using a unique hashing mechanism. Each spell is represented as a string of lowercase letters. The wizards decided to use a hash function that maps each string to a unique integer based on the characters it contains.
 
-## Problem Description
+The hash function is defined as follows:
 
-You are given a sequence of integers. Your task is to generate a unique hash value for the sequence using the following method:
+1. For each character in the string, compute its position in the alphabet (a=1, b=2, ..., z=26).
+2. Compute the hash of the string as the sum of these positions, multiplied by the length of the string.
 
-1. For each integer in the sequence, find the smallest prime number that is greater than or equal to the integer.
-2. Compute the product of these prime numbers.
-3. Given an integer `M`, find the remainder when this product is divided by `M`.
+For example, the hash of the string "abc" is computed as:
+- a → 1
+- b → 2
+- c → 3
+- hash("abc") = (1 + 2 + 3) * 3 = 18
 
-The challenge is to efficiently compute this hash value given the constraints.
+The wizards want to check if there are any pairs of spells that produce the same hash value. Your task is to help them by writing a function that determines the number of unique hash values produced by the spells and the number of pairs of spells that have the same hash value.
 
-## Input Format
+### Input Format
 
-- The first line contains two integers, `N` and `M`:
-  - `N` (1 ≤ N ≤ 10^5) is the number of integers in the sequence.
-  - `M` (1 ≤ M ≤ 10^9) is the modulus value.
-- The second line contains `N` space-separated integers, `a[i]` (1 ≤ a[i] ≤ 10^6), representing the sequence.
+- The first line of input contains an integer `n` (1 ≤ n ≤ 10^5) - the number of spells.
+- The next `n` lines each contain a string `s_i` (1 ≤ |s_i| ≤ 100) - the spell represented as a string of lowercase letters.
 
-## Output Format
+### Output Format
 
-- Output a single integer that is the hash value calculated as described above.
+- The first line should output the number of unique hash values produced by the spells.
+- The second line should output the number of pairs of spells that have the same hash value.
 
-## Constraints
+### Constraints
 
-- The sequence contains up to 100,000 integers.
-- The values in the sequence can be as large as 1,000,000.
-- The modulus value `M` can be as large as 1 billion.
+- Each spell string will only consist of lowercase English letters.
+- The input will not include any empty strings.
+  
+### Example
 
-## Example Test Cases
-
-### Example 1
-
-**Input:**
-
+#### Input
 ```
-5 100
-4 6 8 10 12
-```
-
-**Output:**
-
-```
-84
+5
+abc
+bca
+ac
+xyz
+zxy
 ```
 
-**Explanation:**
-
-- The smallest primes greater than or equal to each number are: 5, 7, 11, 11, 13.
-- The product of these primes is 5 * 7 * 11 * 11 * 13 = 55385.
-- The hash value is 55385 % 100 = 85.
-
-### Example 2
-
-**Input:**
-
+#### Output
 ```
-3 1000
-2 3 5
+3
+2
 ```
 
-**Output:**
+### Explanation
 
+- The unique hash values for the spells are:
+  - "abc" and "bca" both produce a hash of 18.
+  - "ac" produces a hash of 12.
+  - "xyz" and "zxy" both produce a hash of 72.
+  
+Therefore, the unique hash values are 3 (18, 12, and 72), and there are 2 pairs of spells that share the same hash (("abc", "bca") and ("xyz", "zxy")).
+
+### Note
+
+- Make sure to handle cases where multiple spells can produce the same hash efficiently.
+- The solution should ideally run in O(n) or O(n log n) time complexity.
 ```
-30
-```
-
-**Explanation:**
-
-- The smallest primes greater than or equal to each number are: 2, 3, 5.
-- The product of these primes is 2 * 3 * 5 = 30.
-- The hash value is 30 % 1000 = 30.
-
-## Notes
-
-- You may need to use efficient algorithms or precomputations (such as the Sieve of Eratosthenes) to handle large input sizes and constraints.
-- Consider edge cases, such as when all numbers in the sequence are the same or when some of the numbers are already prime.
-
-Your task is to implement the solution that calculates the hash value as efficiently as possible.

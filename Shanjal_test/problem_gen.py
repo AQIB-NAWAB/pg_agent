@@ -159,15 +159,15 @@ def human_feedback_node(state: dict) -> dict:
 builder = StateGraph(GraphState)
 
 # Add all steps
-builder.add_node("GenerateProblem", generate_problem_node)
-builder.add_node("GenerateTestCases", generate_test_cases_node)
+builder.add_node("Load Problem", generate_problem_node)
+builder.add_node("Extract Testcases", generate_test_cases_node)
 builder.add_node("Loop16", loop_generate_cpp_node)
 builder.add_node("HumanFeedback", human_feedback_node)
 
 # Set flow
-builder.set_entry_point("GenerateProblem")
-builder.add_edge("GenerateProblem", "GenerateTestCases")
-builder.add_edge("GenerateTestCases", "Loop16")
+builder.set_entry_point("Load Problem")
+builder.add_edge("Load Problem", "Extract Testcases")
+builder.add_edge("Extract Testcases", "Loop16")
 builder.add_edge("Loop16", "HumanFeedback")
 builder.add_edge("HumanFeedback", END)
 

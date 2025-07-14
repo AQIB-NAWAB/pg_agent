@@ -2335,14 +2335,14 @@
     "input_file": "21.in",
     "output_file": "21.out",
     "passed": false,
-    "error": "TIMEOUT"
+    "diff": "--- expected\n+++ actual\n@@ -1 +1 @@\n-474762828\n+950803680"
   },
   {
     "attempt": "run_7.cpp",
     "input_file": "22.in",
     "output_file": "22.out",
     "passed": false,
-    "diff": "--- expected\n+++ actual\n@@ -1 +0,0 @@\n-237538098"
+    "error": "TIMEOUT"
   },
   {
     "attempt": "run_7.cpp",
@@ -2447,7 +2447,7 @@
     "input_file": "36.in",
     "output_file": "36.out",
     "passed": false,
-    "diff": "--- expected\n+++ actual\n@@ -1 +0,0 @@\n-444991258"
+    "error": "TIMEOUT"
   },
   {
     "attempt": "run_7.cpp",
@@ -2531,7 +2531,7 @@
     "input_file": "47.in",
     "output_file": "47.out",
     "passed": false,
-    "error": "TIMEOUT"
+    "diff": "--- expected\n+++ actual\n@@ -1 +0,0 @@\n-267751351"
   },
   {
     "attempt": "run_7.cpp",

@@ -6,6 +6,7 @@ import difflib
 import os
 import json
 import asyncio
+from collections import defaultdict
 
 # === Constants ===
 PROBLEM_PATH = Path("problem.md")
@@ -13,6 +14,7 @@ TEST_CASES_DIR = Path("test_cases")
 QWEN_DIR = Path("qwen")
 ATTEMPT_COUNT = 16
 FINAL_RESULTS_FILE = Path("final_results.json")
+SUMMARY_FILE = Path("summary.json")
 
 # === Graph State ===
 class GraphState(TypedDict):
@@ -109,11 +111,27 @@ def run_all_attempts_node(state: GraphState) -> GraphState:
     all_results = asyncio.run(run_all())
     return {**state, "all_results": all_results}
 
-# === Save Results ===
+# === Save Results and Summary ===
 def save_results_node(state: GraphState) -> GraphState:
     with open(FINAL_RESULTS_FILE, "w", encoding="utf-8") as f:
         json.dump(state["all_results"], f, indent=2)
     print(f"\n[INFO] Final results saved to {FINAL_RESULTS_FILE}")
+
+    # === Generate Summary ===
+    summary: Dict[str, Dict[str, int]] = defaultdict(lambda: {"pass": 0, "fail": 0, "timeout": 0})
+    for result in state["all_results"]:
+        attempt = result["attempt"]
+        if result.get("error") == "TIMEOUT":
+            summary[attempt]["timeout"] += 1
+        elif result["passed"]:
+            summary[attempt]["pass"] += 1
+        else:
+            summary[attempt]["fail"] += 1
+
+    with open(SUMMARY_FILE, "w", encoding="utf-8") as f:
+        json.dump(summary, f, indent=2)
+    print(f"[INFO] Summary saved to {SUMMARY_FILE}")
+
     return state
 
 # === Build LangGraph ===

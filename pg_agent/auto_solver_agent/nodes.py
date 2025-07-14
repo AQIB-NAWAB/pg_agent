@@ -110,7 +110,6 @@ def refine_solution_node(state: SolverState) -> dict:
         "solution_code": state["solution_code"],
         "test_results": state["test_results"]["details"],
     })
-<<<<<<< HEAD
     return {"solution_code": _extract_cpp_code(response.content)}
 
 def cleanup_node(state: SolverState) -> dict:
@@ -144,32 +143,5 @@ def cleanup_node(state: SolverState) -> dict:
         
         shutil.rmtree(test_cases_dir_path)
         print(f"Removed temporary test directory: {test_cases_dir_path}")
-=======
-    return {"solution_code": response.content}
-
-
-# --- Node for cleanup (no LLM) ---
-def cleanup_node(state: SolverState) -> dict:
-    """Cleans up temporary directories and sets final verdict."""
-    global TEST_CASES_DIR
-    print("--- Cleaning Up and Finalizing ---")
-    
-    if TEST_CASES_DIR and Path(TEST_CASES_DIR).exists():
-        shutil.rmtree(TEST_CASES_DIR)
-        print(f"Removed temporary test directory: {TEST_CASES_DIR}")
-        TEST_CASES_DIR = None
-    
-    verdict = "SUCCESS" if state["test_results"]["failed"] == 0 else "FAILURE"
-    
-    if verdict == "SUCCESS":
-        problem_name = state["problem_statement"].split('\n')[0].replace(' ', '_').lower()[:50]
-        output_dir = Path("solved_problems") / problem_name
-        output_dir.mkdir(parents=True, exist_ok=True)
-        (output_dir / "problem_statement.md").write_text(state["problem_statement"])
-        (output_dir / "solution.cpp").write_text(state["solution_code"])
-        (output_dir / "bruteforce.cpp").write_text(state["bruteforce_code"])
-        (output_dir / "test_generator.cpp").write_text(state["test_generator_code"])
-        print(f"Files saved to: {output_dir}")
->>>>>>> 3d60c04 (auto agent basic flow)
         
     return {"final_verdict": verdict}

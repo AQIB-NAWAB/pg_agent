@@ -8,7 +8,7 @@ import tempfile
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from .schemas import TestCaseGeneratorState
-from ..utils.cli_utils import open_in_editor as _open_in_editor
+from ..utils.cli_utils import open_in_editor
 
 def _extract_cpp_code(response_content: str) -> str:
     """Parses the LLM's response to extract only the C++ code."""
@@ -49,38 +49,45 @@ def _create_generation_node(prompt_file_name: str, output_key: str, version_key:
     """A factory to create a node that generates, allows optional review, and saves a C++ script."""
     def generation_node(state: TestCaseGeneratorState) -> dict:
         print(f"--- Generating: {output_key} ---")
-        
         prompt_path = Path(__file__).parent / "prompts" / prompt_file_name
         prompt = ChatPromptTemplate.from_template(prompt_path.read_text(encoding="utf-8"))
         chain = prompt | get_llm_client()
-        
         response = chain.invoke({
             "problem_statement": state["problem_statement"],
             "bruteforce_code": state["bruteforce_code"]
         })
-        
         code = _extract_cpp_code(response.content)
         
         print("\n" + "="*60)
-        wants_to_review = questionary.confirm(
-            f"The '{version_key.replace('Version', '')}' script has been generated. Would you like to review or edit it?",
-            default=False,
-            qmark="?"
+        choice = questionary.select(
+            f"The '{version_key.replace('Version', '')}' script has been generated. What would you like to do?",
+            choices=["Accept and Continue", "Edit the Code Manually", "Provide Feedback to Refine"],
+            qmark="?",
+            pointer="»"
         ).ask()
-        
-        if wants_to_review:
+
+        if not choice or "Accept" in choice:
+            print("--- Proceeding with AI-generated script. ---")
+        elif "Edit" in choice:
             with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix=".cpp", encoding="utf-8") as tf:
                 temp_code_path = Path(tf.name)
                 tf.write(code)
-            
-            _open_in_editor(temp_code_path)
-            
+            open_in_editor(temp_code_path)
             code = temp_code_path.read_text(encoding="utf-8")
             os.unlink(temp_code_path)
-            print("--- Script updated with your changes. ---")
-        else:
-            print("--- Skipping review. Proceeding with AI-generated script. ---")
+            print("--- Script updated with your manual changes. ---")
+        elif "Refine" in choice:
+            # Note: A true refinement loop would require a new prompt and graph edge.
+            # For now, we'll just let the user edit.
+            print("Refinement via feedback is not yet implemented for this node. Please edit manually.")
+            with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix=".cpp", encoding="utf-8") as tf:
+                temp_code_path = Path(tf.name)
+                tf.write(code)
+            open_in_editor(temp_code_path)
+            code = temp_code_path.read_text(encoding="utf-8")
+            os.unlink(temp_code_path)
         print("="*60)
+
 
         automation_dir = Path(state['problem_dir_path']) / "automation"
         settings_path = automation_dir / "automation_settings.json"

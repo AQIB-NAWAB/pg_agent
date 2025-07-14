@@ -55,29 +55,47 @@ def gen_bruteforce_node(state: BruteForceState) -> dict:
     return {"bruteforce_code": _extract_cpp_code(response.content)}
 
 def interactive_review_node(state: BruteForceState) -> dict:
-    """Optionally allows the user to review and edit the generated code."""
+    """Presents a menu to allow the user to accept, edit, or refine the code."""
     print("\n" + "="*60)
-    wants_to_review = questionary.confirm(
-        "A bruteforce solution has been generated. Would you like to review or edit it before testing?",
-        default=False,
-        qmark="?"
+    choice = questionary.select(
+        "A bruteforce solution has been generated. What would you like to do?",
+        choices=[
+            "Accept and Continue",
+            "Edit the Code Manually",
+            "Provide Feedback to Refine"
+        ],
+        qmark="?",
+        pointer="»"
     ).ask()
-    
-    if not wants_to_review:
-        print("--- Skipping review. Proceeding with AI-generated code. ---")
-        return {}
 
-    with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix=".cpp", encoding="utf-8") as tf:
-        temp_code_path = Path(tf.name)
-        tf.write(state["bruteforce_code"])
-    
-    open_in_editor(temp_code_path)
-    
-    modified_code = temp_code_path.read_text(encoding="utf-8")
-    os.unlink(temp_code_path)
-    
-    print("--- Code updated with your changes. ---")
-    return {"bruteforce_code": modified_code}
+    if not choice or "Accept" in choice:
+        print("--- Proceeding with AI-generated code. ---")
+        return {"human_feedback": None}
+
+    elif "Edit" in choice:
+        with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix=".cpp", encoding="utf-8") as tf:
+            temp_code_path = Path(tf.name)
+            tf.write(state["bruteforce_code"])
+        open_in_editor(temp_code_path)
+        modified_code = temp_code_path.read_text(encoding="utf-8")
+        os.unlink(temp_code_path)
+        print("--- Code updated with your manual changes. ---")
+        return {"bruteforce_code": modified_code, "human_feedback": None}
+
+    elif "Refine" in choice:
+        with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix=".txt", encoding="utf-8") as tf:
+            feedback_file_path = Path(tf.name)
+            tf.write("# Please enter your feedback to the AI below.\n")
+        open_in_editor(feedback_file_path)
+        feedback = feedback_file_path.read_text(encoding="utf-8")
+        os.unlink(feedback_file_path)
+        clean_feedback = "\n".join([line for line in feedback.splitlines() if not line.strip().startswith('#')]).strip()
+        if clean_feedback:
+            print("--- Feedback received. Preparing to refine solution. ---")
+            return {"human_feedback": clean_feedback}
+        else:
+            print("--- No feedback provided. Proceeding with current code. ---")
+            return {"human_feedback": None}
 
 def test_bruteforce_on_examples_node(state: BruteForceState) -> dict:
     """Tests the current bruteforce code against all loaded example cases."""

@@ -25,5 +25,5 @@ Write a C++ program that generates a small number of **very large test cases**. 
 {bruteforce_code}
 ```
 Your Output:
-Write the complete C++ code for the stress test case generator program. Do not add any explanations or markdown formatting.
+Write the complete C++ code for the stress test case generator program. Do not add any explanations, comments, or markdown formatting.
 ---

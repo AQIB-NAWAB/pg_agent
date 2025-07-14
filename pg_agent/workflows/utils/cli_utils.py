@@ -1,4 +1,5 @@
 import os
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -6,47 +7,38 @@ from pathlib import Path
 def open_in_editor(file_path: Path):
     """
     Opens a file in an editor with a smart, cross-platform strategy.
-    It prioritizes VS Code but has safe fallbacks.
+    It reads from 'pg_agent_settings.json' to determine the editor.
     """
-    # The --wait flag is crucial. It tells the 'code' command to pause the script
-    # until the user saves and closes the file tab in VS Code.
-    editor_commands = [
-        # 1. Highest Priority: The EDITOR environment variable, which VS Code's
-        #    integrated terminal often sets correctly.
-        os.environ.get('EDITOR'),
-        
-        # 2. Second Priority: The standard 'code' command with the --wait flag.
-        #    This works if the user has installed 'code' in their system's PATH.
-        "code --wait",
-    ]
+    editor_command = "system_default"
+    settings_path = Path.cwd() / "pg_agent_settings.json"
 
-    # Try the editor commands in order of priority
-    for command_str in editor_commands:
-        if command_str:
-            try:
-                # We use shell=True for Windows compatibility and to handle commands with arguments
-                print(f"Attempting to open editor with command: '{command_str}'...")
-                subprocess.run(f'{command_str} "{file_path}"', shell=True, check=True)
-                # If the command succeeds, we are done.
-                return
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                # This command failed, try the next one in the list.
-                print(f"Command '{command_str}' failed. Trying next option...")
-                continue
+    if settings_path.exists():
+        try:
+            settings = json.loads(settings_path.read_text(encoding="utf-8"))
+            editor_command = settings.get("default_editor", "system_default")
+        except json.JSONDecodeError:
+            print(f"Warning: Could not parse {settings_path}. Using system default editor.")
 
-    # --- Failsafe Fallback ---
-    # If all preferred methods fail, fall back to the OS default.
-    print("Could not find a configured editor. Falling back to system default.")
+    print(f"Opening {file_path.name} for your review...")
+
     try:
-        if sys.platform == "win32":
-            os.startfile(file_path)
-        elif sys.platform == "darwin": # macOS
-            subprocess.run(["open", str(file_path)], check=True)
-        else: # Linux
-            subprocess.run(["xdg-open", str(file_path)], check=True)
+        if editor_command == "system_default":
+            if sys.platform == "win32":
+                os.startfile(file_path)
+            elif sys.platform == "darwin": # macOS
+                subprocess.run(["open", str(file_path)], check=True)
+            else: # Linux
+                subprocess.run(["xdg-open", str(file_path)], check=True)
+            # After launching the non-blocking default editor, wait for user confirmation
+            input("\nPress Enter to continue after you have saved and closed the editor...")
+        else:
+            # Use the user-specified command (e.g., "code --wait")
+            print(f"(Using custom editor command: '{editor_command}')")
+            # The command itself is not quoted, only the file path.
+            subprocess.run(f'{editor_command} "{file_path}"', shell=True, check=True)
+            
     except Exception as e:
-        # If even the fallback fails, provide manual instructions.
-        print(f"\nFATAL: Could not open any editor: {e}")
-        print("Please manually open the following file, add your notes, save, and close it.")
+        print(f"\nError opening editor '{editor_command}': {e}")
+        print("Please manually open the file, add your notes, save, and close it.")
         print(f"File path: {file_path.resolve()}")
         input("Press Enter to continue after you have saved and closed the file...")

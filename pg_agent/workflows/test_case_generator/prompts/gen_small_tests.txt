@@ -28,6 +28,7 @@ Write a C++ program that generates a **high volume of small, tricky test cases**
 ```cpp
 {bruteforce_code}
 ```
+
 Your Output:
 Write the complete C++ code for the small test case generator program. Do not add any explanations or markdown formatting.
 ---

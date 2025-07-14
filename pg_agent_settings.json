@@ -1,0 +1,16 @@
+{
+    "_comment_1": "This file controls global settings for the PG-Agent workflows.",
+    "_comment_2": "To change the editor used for interactive feedback, modify 'default_editor'.",
+    "default_editor": "code --wait",
+    "_comment_3": "--- AVAILABLE OPTIONS for default_editor ---",
+    "_comment_4": "1. 'system_default': (Recommended) Uses your OS's default application for .txt/.cpp files.",
+    "_comment_5": "2. 'code --wait': Use this for Visual Studio Code (requires 'code' in your system's PATH).",
+    "_comment_6": "3. Any other CLI command for an editor, e.g., 'subl --wait', 'notepad++'.",
+    "workflow_parameters": {
+        "_comment": "These values control the behavior of the generation and refinement loops.",
+        "max_refinement_iterations": 5,
+        "bruteforce_time_limit_seconds": 2.0,
+        "num_small_test_batches": 1,
+        "num_stress_test_batches": 1
+    }
+}

@@ -1,0 +1,24 @@
+You are a helpful assistant that extracts test cases from problem statements and formats them in a specific XML format.
+
+Here is the problem statement:
+{problem_statement}
+
+Extract all test cases from the above problem statement and format them as follows:
+
+<test_case>
+<input>
+[input data here]
+</input>
+<output>
+[output data here]
+</output>
+</test_case>
+
+Rules:
+1. Include ALL test cases from the problem statement
+2. Keep the exact input/output values, just change the format
+3. Remove any explanations or descriptions, keep only the actual input/output data
+4. Each test case must be wrapped in test_case tags
+5. Input must be wrapped in input tags
+6. Output must be wrapped in output tags
+7. Preserve all whitespace and newlines in the input/output data exactly as they appear 

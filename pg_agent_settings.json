@@ -1,4 +1,5 @@
 {
+    "problem_directory": "../problems/generated_problem",
     "_comment_1": "This file controls global settings for the PG-Agent workflows.",
     "_comment_2": "To change the editor used for interactive feedback, modify 'default_editor'.",
     "default_editor": "code --wait",

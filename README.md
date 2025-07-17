@@ -58,6 +58,23 @@ This will start a local web server on `http://localhost:2024/` (the exact port i
 ---
 ## 4 . Command-line Quick-start (without Studio)
 
+### Install docker
+
+Additionally install `docker-credential-helper`.
+On MacOS:
+```
+brew install docker-credential-helper
+```
+Check your ~/.docker/config.json and replace "credsStore" by "credStore":
+```
+sed -i 's/"credsStore"/"credStore"/g' ~/.docker/config.json
+```
+Add docker cli path:
+```
+echo 'export PATH="$HOME/.docker/bin:$PATH"' >> ~/.zshrc
+```
+
+
 If you just want to run the pipeline headless:
 
 ```bash

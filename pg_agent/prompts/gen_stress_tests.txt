@@ -9,7 +9,7 @@ Write a C++ program that generates a small number of **very large test cases**. 
 3.  Design your test cases to be large enough that they would likely cause the bruteforce solution to time out, but would be solvable by an efficient, optimal solution.
 
 **Test Case Generation Strategy:**
-- Your program must generate between 5 and 10 test case files.
+- Your program must generate between 5 and 10 test case files (`1.in`, `2.in`, etc.).
 - Focus on maximum or near-maximum constraints for all parameters.
 - Ensure the generated inputs are random but **strictly adhere to all problem constraints**.
 - The first line of your code must be `#include <bits/stdc++.h>`.

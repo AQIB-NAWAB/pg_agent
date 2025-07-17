@@ -18,12 +18,13 @@ from pg_agent.nodes.test_generator_nodes import (
 from pg_agent.utils.logging import setup_logging
 from pg_agent.utils.structure import get_default_problem_dir
 
-def build_test_generator_graph(mode: str, refine: bool = False) -> StateGraph:
+def build_test_generator_graph(skip_small: bool = False, skip_stress: bool = False, skip_validator: bool = False) -> StateGraph:
     """Builds the graph for generating test cases and validator.
     
     Args:
-        mode: Either 'small', 'stress', or 'validator' to determine which generator to use
-        refine: Whether to refine existing generator instead of creating new one
+        skip_small: Whether to skip small test generation
+        skip_stress: Whether to skip stress test generation
+        skip_validator: Whether to skip validator generation
     """
     workflow = StateGraph(TestCaseGeneratorState)
     
@@ -33,18 +34,27 @@ def build_test_generator_graph(mode: str, refine: bool = False) -> StateGraph:
     workflow.add_node("gen_stress_tests", gen_stress_tests_node)
     workflow.add_node("gen_validator", gen_validator_node)
     
-    # Define flow based on mode
+    # Define flow based on skip flags
     workflow.set_entry_point("load_context")
     
-    if mode == "small":
-        workflow.add_edge("load_context", "gen_small_tests")
-        workflow.add_edge("gen_small_tests", END)
-    elif mode == "stress":
-        workflow.add_edge("load_context", "gen_stress_tests")
-        workflow.add_edge("gen_stress_tests", END)
-    else:  # validator
-        workflow.add_edge("load_context", "gen_validator")
-        workflow.add_edge("gen_validator", END)
+    # Track the last node to chain the flow
+    last_node = "load_context"
+    
+    # Add each generator if not skipped
+    if not skip_small:
+        workflow.add_edge(last_node, "gen_small_tests")
+        last_node = "gen_small_tests"
+    
+    if not skip_stress:
+        workflow.add_edge(last_node, "gen_stress_tests")
+        last_node = "gen_stress_tests"
+    
+    if not skip_validator:
+        workflow.add_edge(last_node, "gen_validator")
+        last_node = "gen_validator"
+    
+    # Connect last node to END
+    workflow.add_edge(last_node, END)
     
     return workflow.compile()
 
@@ -57,14 +67,13 @@ def main():
     parser.add_argument("problem_dir", nargs="?", default=default_dir,
                        help=f"Path to the problem directory (default: {default_dir})")
     
-    # Add generator type options
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument("--small", action="store_true", default=True,
-                      help="Generate small test cases (default)")
-    group.add_argument("--stress", action="store_true",
-                      help="Generate stress test cases")
-    group.add_argument("--validator", action="store_true",
-                      help="Generate test case validator")
+    # Replace generator type options with skip flags
+    parser.add_argument("--skip-small", action="store_true",
+                      help="Skip generating small test cases")
+    parser.add_argument("--skip-stress", action="store_true",
+                      help="Skip generating stress test cases")
+    parser.add_argument("--skip-validator", action="store_true",
+                      help="Skip generating test case validator")
     
     # Add refine option with feedback
     parser.add_argument("--refine", metavar="FEEDBACK",
@@ -96,9 +105,6 @@ def main():
         print("Error: automation_settings.json not found. Please run bruteforce generator first.")
         sys.exit(1)
 
-    # Determine mode
-    mode = "validator" if args.validator else ("stress" if args.stress else "small")
-
     # Prepare initial state
     initial_state: TestCaseGeneratorState = {
         "problem_dir_path": str(problem_dir),
@@ -110,29 +116,46 @@ def main():
         "final_verdict": None,
         "refine_mode": args.refine is not None,  # True if --refine is provided
         "user_feedback": args.refine or "",  # Use feedback from --refine argument
-        "mode": mode  # Add current mode to state
+        "skip_small": args.skip_small,
+        "skip_stress": args.skip_stress,
+        "skip_validator": args.skip_validator
     }
 
     # Run the workflow
-    graph = build_test_generator_graph(mode, args.refine is not None)
+    graph = build_test_generator_graph(
+        skip_small=args.skip_small,
+        skip_stress=args.skip_stress,
+        skip_validator=args.skip_validator
+    )
+    
     try:
         final_state = graph.invoke(initial_state)
         print("\n--- Workflow Finished ---")
         
-        # Check if we have the required output based on mode
-        output_path = None
-        if mode == "small" and final_state.get("small_test_gen_path"):
-            output_path = final_state["small_test_gen_path"]
-            print(f"Small tests generator created successfully: {output_path}")
-        elif mode == "stress" and final_state.get("stress_test_gen_path"):
-            output_path = final_state["stress_test_gen_path"]
-            print(f"Stress tests generator created successfully: {output_path}")
-        elif mode == "validator" and final_state.get("validator_path"):
-            output_path = final_state["validator_path"]
-            print(f"Test case validator created successfully: {output_path}")
-            
-        if not output_path:
-            print(f"Failed to generate {mode} script.")
+        # Report status for each component
+        if not args.skip_small:
+            if final_state.get("small_test_gen_path"):
+                print(f"✓ Small tests generator created: {final_state['small_test_gen_path']}")
+            else:
+                print("✗ Failed to generate small tests")
+                
+        if not args.skip_stress:
+            if final_state.get("stress_test_gen_path"):
+                print(f"✓ Stress tests generator created: {final_state['stress_test_gen_path']}")
+            else:
+                print("✗ Failed to generate stress tests")
+                
+        if not args.skip_validator:
+            if final_state.get("validator_path"):
+                print(f"✓ Test case validator created: {final_state['validator_path']}")
+            else:
+                print("✗ Failed to generate validator")
+        
+        # Check if any requested component failed
+        if ((not args.skip_small and not final_state.get("small_test_gen_path")) or
+            (not args.skip_stress and not final_state.get("stress_test_gen_path")) or
+            (not args.skip_validator and not final_state.get("validator_path"))):
+            print("\nSome components failed to generate.")
             sys.exit(1)
             
     except Exception as e:

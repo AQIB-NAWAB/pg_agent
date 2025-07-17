@@ -3,7 +3,7 @@ import re
 import json
 import logging
 from pathlib import Path
-from typing import TypedDict, Optional, List, Tuple, Literal
+from typing import TypedDict, Optional, List, Tuple
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from ..utils.parsing import parse_test_cases
@@ -23,7 +23,9 @@ class TestCaseGeneratorState(TypedDict):
     final_verdict: str
     refine_mode: bool  # Whether to refine existing generator
     user_feedback: str  # User feedback for refinement
-    mode: Literal["small", "stress", "validator"]  # Current generation mode
+    skip_small: bool  # Whether to skip small test generation
+    skip_stress: bool  # Whether to skip stress test generation
+    skip_validator: bool  # Whether to skip validator generation
 
 class SimpleTestGenerationState(TypedDict):
     """State for simple test case generation workflow."""
@@ -47,7 +49,7 @@ def load_context_node(state: TestCaseGeneratorState) -> dict:
     """Loads the problem statement and bruteforce solution if needed.
     
     Only loads bruteforce solution for test generators (small/stress).
-    For validator, or when not refining, only loads problem statement.
+    For validator-only runs, or when not refining, only loads problem statement.
     """
     print(f"--- Loading context from: {state['problem_dir_path']} ---")
     problem_dir = Path(state['problem_dir_path'])
@@ -59,9 +61,9 @@ def load_context_node(state: TestCaseGeneratorState) -> dict:
     problem_statement = problem_statement_path.read_text(encoding="utf-8")
     print("Loaded problem statement")
     
-    # Only load bruteforce solution for test generators
+    # Only load bruteforce solution if we're generating tests
     bruteforce_code = ""
-    if state["mode"] in ["small", "stress"]:
+    if not (state["skip_small"] and state["skip_stress"]):
         automation_dir = problem_dir / "automation"
         settings_path = automation_dir / "automation_settings.json"
         
@@ -114,7 +116,7 @@ def generate_simple_test_cases(state: SimpleTestGenerationState) -> SimpleTestGe
     print(f"Generated and saved {len(test_cases)} test cases.")
     return {"test_cases": test_cases}
 
-def _create_generation_node(prompt_file_name: str, output_key: str, version_key: str):
+def _create_generation_node(prompt_file_name: str, output_key: str, version_key: str, needs_bruteforce: bool = True):
     """A factory to create a node that generates test case generator scripts."""
     def generation_node(state: TestCaseGeneratorState) -> dict:
         print(f"--- Generating: {output_key} ---")
@@ -154,7 +156,7 @@ def _create_generation_node(prompt_file_name: str, output_key: str, version_key:
         # Include existing code and feedback in prompt if refining
         variables = {
             "problem_statement": state["problem_statement"],
-            "bruteforce_code": state["bruteforce_code"] if state["mode"] in ["small", "stress"] else ""
+            "bruteforce_code": state["bruteforce_code"] if needs_bruteforce else ""
         }
         if state["refine_mode"] and existing_code:
             variables["existing_code"] = existing_code
@@ -183,11 +185,11 @@ def _create_generation_node(prompt_file_name: str, output_key: str, version_key:
 
 # Create the generator nodes
 gen_small_tests_node = _create_generation_node(
-    "gen_small_tests.txt", "small_test_gen_path", "smallTestcaseGeneratorVersion"
+    "gen_small_tests.txt", "small_test_gen_path", "smallTestcaseGeneratorVersion", needs_bruteforce=True
 )
 gen_stress_tests_node = _create_generation_node(
-    "gen_stress_tests.txt", "stress_test_gen_path", "stressTestcaseGeneratorVersion"
+    "gen_stress_tests.txt", "stress_test_gen_path", "stressTestcaseGeneratorVersion", needs_bruteforce=True
 )
 gen_validator_node = _create_generation_node(
-    "gen_validator.txt", "validator_path", "testcaseValidatorVersion"
+    "gen_validator.txt", "validator_path", "testcaseValidatorVersion", needs_bruteforce=False
 ) 

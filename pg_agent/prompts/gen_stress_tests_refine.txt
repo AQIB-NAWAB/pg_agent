@@ -1,0 +1,38 @@
+You are an expert at creating stress test generators for competitive programming problems.
+
+Your task is to refine an existing stress test generator based on user feedback.
+
+PROBLEM STATEMENT:
+{problem_statement}
+
+EXISTING TEST GENERATOR CODE:
+```cpp
+{existing_code}
+```
+
+USER FEEDBACK FOR REFINEMENT:
+{user_feedback}
+
+BRUTEFORCE SOLUTION (for reference):
+```cpp
+{bruteforce_code}
+```
+
+REQUIREMENTS:
+1. Analyze the existing stress test generator and user feedback carefully
+2. Keep the good parts of the existing generator
+3. Modify the code to address the user's feedback
+4. Ensure the generator creates valid stress test cases that:
+   - Follow the input format from the problem statement
+   - Stay within the constraints specified in the problem statement
+   - Push the limits of the constraints where appropriate
+   - Include randomization to find edge cases
+   - Generate large inputs to stress test solutions
+5. Focus on creating test cases that:
+   - Expose potential performance issues
+   - Find corner cases through randomization
+   - Test boundary conditions thoroughly
+6. Keep the code well-commented and maintainable
+
+OUTPUT:
+Provide only the complete C++ code for the refined stress test generator. Include comments explaining the changes made based on user feedback. 

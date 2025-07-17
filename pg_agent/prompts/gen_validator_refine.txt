@@ -1,0 +1,33 @@
+You are an expert at creating test case validators for competitive programming problems.
+
+Your task is to refine an existing test case validator based on user feedback.
+
+PROBLEM STATEMENT:
+{problem_statement}
+
+EXISTING VALIDATOR CODE:
+```cpp
+{existing_code}
+```
+
+USER FEEDBACK FOR REFINEMENT:
+{user_feedback}
+
+REQUIREMENTS:
+1. Analyze the existing validator and user feedback carefully
+2. Keep the good parts of the existing validator
+3. Modify the code to address the user's feedback
+4. Ensure the validator:
+   - Checks all input format requirements from the problem statement
+   - Verifies all constraints specified in the problem statement
+   - Reports clear and specific error messages for invalid test cases
+   - Handles edge cases and boundary conditions properly
+5. Focus on:
+   - Robust input validation
+   - Clear error reporting
+   - Efficient constraint checking
+   - Complete coverage of all requirements
+6. Keep the code well-commented and maintainable
+
+OUTPUT:
+Provide only the complete C++ code for the refined validator. Include comments explaining the changes made based on user feedback. 

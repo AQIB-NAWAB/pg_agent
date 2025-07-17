@@ -4,13 +4,12 @@ import json
 import argparse
 import logging
 from pathlib import Path
-from typing import TypedDict, List, Tuple
 from dotenv import load_dotenv
 from langgraph.graph import StateGraph, END
 
-from pg_agent.nodes.test_generation_nodes import (
-    generate_test_cases,
-    TestGenerationState,
+from pg_agent.nodes.test_generator_nodes import (
+    SimpleTestGenerationState,
+    generate_simple_test_cases,
 )
 from pg_agent.utils.logging import setup_logging
 from pg_agent.utils.structure import get_default_problem_dir
@@ -18,10 +17,10 @@ from pg_agent.utils.structure import get_default_problem_dir
 def build_test_cases_creator_graph() -> StateGraph:
     """Builds a minimal graph that only generates example test cases."""
     # Initialize with our simplified state type
-    workflow = StateGraph(TestGenerationState)
+    workflow = StateGraph(SimpleTestGenerationState)
 
     # Add just the test cases generation node
-    workflow.add_node("generate_tests", generate_test_cases)
+    workflow.add_node("generate_tests", generate_simple_test_cases)
 
     # Set up the simple flow
     workflow.set_entry_point("generate_tests")
@@ -39,7 +38,8 @@ def main():
                        help=f"Path to the problem directory (default: {default_dir})")
     
     # Add verbose flag
-    parser.add_argument("--verbose", action="store_true", help="Enable verbose logging output")
+    parser.add_argument("--verbose", action="store_true",
+                       help="Enable verbose logging output")
     
     args = parser.parse_args()
 
@@ -60,10 +60,10 @@ def main():
     problem_statement = problem_statement_path.read_text(encoding="utf-8")
 
     # Prepare initial state with only the required fields for test case generation
-    initial_state: TestGenerationState = {
+    initial_state: SimpleTestGenerationState = {
         "output_dir": str(problem_dir),
         "problem_statement": problem_statement,
-        "test_cases": [],
+        "test_cases": []
     }
 
     # Run the workflow
@@ -71,7 +71,11 @@ def main():
     try:
         final_state = graph.invoke(initial_state)
         print("\n--- Workflow Finished ---")
-        print(f"Simple test cases generated successfully in: {final_state['output_dir']}/test_cases/")
+        if final_state.get("test_cases"):
+            print(f"Generated {len(final_state['test_cases'])} test cases successfully in: {problem_dir}/test_cases/")
+        else:
+            print("Failed to generate test cases.")
+            sys.exit(1)
     except Exception as e:
         print(f"\nError: {str(e)}")
         sys.exit(1)

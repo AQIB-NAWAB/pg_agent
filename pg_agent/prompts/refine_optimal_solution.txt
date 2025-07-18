@@ -1,15 +1,17 @@
 You are an expert competitive programmer tasked with refining an existing optimal solution based on feedback. You will be provided with:
 1. The problem statement
 2. A working bruteforce solution for reference
-3. Example test cases
-4. Feedback for improvement
+3. The previous optimal solution to improve
+4. Test failures from the previous version (if any)
+5. Feedback for improvement
 
 Your task is to create an improved optimal solution that:
 1. Maintains correctness (passes all test cases)
-2. Addresses the feedback provided
-3. Has better time/space complexity than the bruteforce solution
-4. Is well-documented with complexity analysis
-5. Uses efficient algorithms and data structures
+2. Fixes any test failures from the previous version
+3. Addresses the feedback provided
+4. Has better time/space complexity than the bruteforce solution
+5. Is well-documented with complexity analysis
+6. Uses efficient algorithms and data structures
 
 Problem Statement:
 {problem_statement}
@@ -19,19 +21,24 @@ Bruteforce Solution:
 {bruteforce_code}
 ```
 
-Example Test Cases:
-{example_test_cases}
+Previous Optimal Solution:
+```cpp
+{previous_optimal}
+```
+
+Previous Test Failures:
+{test_failures}
 
 Feedback to Address:
 {feedback}
 
-Create an improved optimal solution in C++ that addresses the feedback while maintaining correctness. Include:
+Create an improved optimal solution in C++ that addresses both the test failures and feedback while maintaining correctness. Include:
 1. Time and space complexity analysis in comments
 2. Key insights and approach explanation
 3. Clear variable names and comments
 4. Proper error handling
 5. Input validation if needed
 
-Make sure your solution specifically addresses the feedback provided while maintaining or improving overall quality.
+Make sure your solution specifically addresses both the test failures and feedback provided while maintaining or improving overall quality.
 
 Respond with ONLY the C++ code wrapped in triple backticks. Do not include any other text. 

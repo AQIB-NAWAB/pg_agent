@@ -1,7 +1,6 @@
 You are an expert competitive programmer tasked with creating an optimal solution for a programming problem. You will be provided with:
 1. The problem statement
 2. A working bruteforce solution
-3. Example test cases
 
 Your task is to create an optimal solution that:
 1. Solves the problem correctly
@@ -17,9 +16,6 @@ Bruteforce Solution:
 ```cpp
 {bruteforce_code}
 ```
-
-Example Test Cases:
-{example_test_cases}
 
 Create an optimal solution in C++ that improves upon the bruteforce approach. Include:
 1. Time and space complexity analysis in comments

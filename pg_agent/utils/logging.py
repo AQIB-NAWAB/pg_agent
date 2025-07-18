@@ -1,5 +1,15 @@
 import logging
 
+def get_log_level(level_name: str) -> int:
+    """Convert log level name to logging constant."""
+    return {
+        'debug': logging.DEBUG,
+        'info': logging.INFO,
+        'warning': logging.WARNING,
+        'error': logging.ERROR,
+        'critical': logging.CRITICAL
+    }.get(level_name.lower(), logging.INFO)
+
 def setup_logging(log_level: int = logging.INFO) -> None:
     """Configure logging for the application.
     

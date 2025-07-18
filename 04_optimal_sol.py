@@ -14,18 +14,8 @@ from pg_agent.nodes.optimal_nodes import (
     generate_optimal_node,
     test_optimal_node,
 )
-from pg_agent.utils.logging import setup_logging
+from pg_agent.utils.logging import setup_logging, get_log_level
 from pg_agent.utils.structure import get_default_problem_dir, get_problem_paths
-
-def get_log_level(level_name: str) -> int:
-    """Convert log level name to logging constant."""
-    return {
-        'debug': logging.DEBUG,
-        'info': logging.INFO,
-        'warning': logging.WARNING,
-        'error': logging.ERROR,
-        'critical': logging.CRITICAL
-    }.get(level_name.lower(), logging.INFO)
 
 def get_next_version(problem_dir: Path) -> int:
     """Get the next version number for optimal solution."""

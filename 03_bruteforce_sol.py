@@ -11,51 +11,25 @@ from langgraph.graph import StateGraph, END
 from pg_agent.nodes.bruteforce_nodes import (
     BruteForceState,
     load_problem_statement_node,
-    generate_bruteforce_node,
+    generate_or_refine_bruteforce_node,
     test_bruteforce_node,
-    refine_bruteforce_node,
 )
-from pg_agent.utils.logging import setup_logging
+from pg_agent.utils.logging import setup_logging, get_log_level
 from pg_agent.utils.structure import get_default_problem_dir, get_problem_paths
 
-def get_log_level(level_name: str) -> int:
-    """Convert log level name to logging constant."""
-    return {
-        'debug': logging.DEBUG,
-        'info': logging.INFO,
-        'warning': logging.WARNING,
-        'error': logging.ERROR,
-        'critical': logging.CRITICAL
-    }.get(level_name.lower(), logging.INFO)
-
-def build_bruteforce_graph(is_refinement: bool = False) -> StateGraph:
-    """Builds the graph for generating and refining bruteforce solutions.
-    
-    Args:
-        is_refinement: If True, runs refinement flow instead of generation
-    """
+def build_bruteforce_graph() -> StateGraph:
+    """Builds the graph for generating and refining bruteforce solutions."""
     workflow = StateGraph(BruteForceState)
     
-    if is_refinement:
-        # Refinement flow: load -> refine -> test -> end
-        workflow.add_node("load", load_problem_statement_node)
-        workflow.add_node("refine", refine_bruteforce_node)
-        workflow.add_node("test", test_bruteforce_node)
-        
-        workflow.set_entry_point("load")
-        workflow.add_edge("load", "refine")
-        workflow.add_edge("refine", "test")
-        workflow.add_edge("test", END)
-    else:
-        # Generation flow: load -> generate -> test -> end
-        workflow.add_node("load", load_problem_statement_node)
-        workflow.add_node("generate", generate_bruteforce_node)
-        workflow.add_node("test", test_bruteforce_node)
-        
-        workflow.set_entry_point("load")
-        workflow.add_edge("load", "generate")
-        workflow.add_edge("generate", "test")
-        workflow.add_edge("test", END)
+    # Single flow: load -> generate/refine -> test -> end
+    workflow.add_node("load", load_problem_statement_node)
+    workflow.add_node("generate_or_refine", generate_or_refine_bruteforce_node)
+    workflow.add_node("test", test_bruteforce_node)
+    
+    workflow.set_entry_point("load")
+    workflow.add_edge("load", "generate_or_refine")
+    workflow.add_edge("generate_or_refine", "test")
+    workflow.add_edge("test", END)
     
     return workflow.compile()
 
@@ -112,7 +86,7 @@ def main():
         "problem_dir_path": str(problem_dir),
         "problem_statement": "",
         "example_test_cases": [],
-        "bruteforce_code": None,
+        "bruteforce_code": None,  # Will be set by generate_or_refine node
         "test_failures": [],
         "iteration_count": next_version,
         "human_feedback": args.refine if args.refine is not None else None,
@@ -121,7 +95,7 @@ def main():
     }
 
     # Run the workflow
-    graph = build_bruteforce_graph(is_refinement=args.refine is not None)
+    graph = build_bruteforce_graph()
     try:
         final_state = graph.invoke(initial_state)
         logger.info("--- Workflow Finished ---")

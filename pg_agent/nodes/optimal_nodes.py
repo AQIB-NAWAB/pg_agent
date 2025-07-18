@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import TypedDict, Optional, List, Dict, Any, Tuple, Literal
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
+from langchain_core.messages import HumanMessage
 import re
 
 from ..utils.structure import get_problem_paths
@@ -110,6 +111,15 @@ def generate_optimal_node(state: OptimalSolutionState) -> dict:
             "problem_statement": state["problem_statement"],
             "bruteforce_code": state["bruteforce_code"]
         }
+    
+    # Debug: Print the final rendered prompt
+    messages = prompt.format_messages(**variables)
+    logger.debug("Final rendered prompt:")
+    logger.debug("=" * 80)
+    for msg in messages:
+        if isinstance(msg, HumanMessage):
+            logger.debug(msg.content)
+    logger.debug("=" * 80)
     
     # Generate solution
     chain = prompt | get_llm_client()

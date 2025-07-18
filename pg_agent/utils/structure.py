@@ -8,6 +8,7 @@ class ProblemPaths:
         self.root = problem_dir
         self.problem_statement = self.root / "problem_statement.md"
         self.standard_solution = self.root / "standard.cpp"
+        self.bruteforce_solution = self.root / "solution_bf.cpp"  # Add bruteforce solution path
         self.automation = self.root / "automation"
         self.automation_settings = self.automation / "automation_settings.json"
         self.bruteforce_dir = self.automation / "bruteForceSol"
@@ -26,11 +27,19 @@ class ProblemPaths:
         """Reads and returns the automation settings."""
         if not self.automation_settings.exists():
             return {}
-        return json.loads(self.automation_settings.read_text(encoding="utf-8"))
+        try:
+            return json.loads(self.automation_settings.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            print(f"Warning: Invalid JSON in settings file: {self.automation_settings}")
+            return {}
 
     def update_settings(self, settings: Dict) -> None:
         """Updates the automation settings file."""
-        self.automation_settings.write_text(json.dumps(settings, indent=4), encoding="utf-8")
+        self.automation.mkdir(exist_ok=True)
+        self.automation_settings.write_text(
+            json.dumps(settings, indent=2, sort_keys=True),
+            encoding="utf-8"
+        )
 
 def get_default_problem_dir() -> Optional[str]:
     """Get the default problem directory from settings."""

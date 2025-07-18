@@ -6,7 +6,8 @@ from typing import TypedDict, List, Dict, Optional, Tuple
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
-from ..pipeline.sandbox.sandbox_utils import run_single_test
+from ..utils.test_runner import find_test_cases, run_tests
+from ..utils.structure import get_problem_paths
 
 class BruteForceState(TypedDict):
     """State definition for the bruteforce solution generator."""
@@ -21,24 +22,16 @@ class BruteForceState(TypedDict):
     final_verdict: Optional[str]  # Final status of the solution generation
     final_bruteforce_path: Optional[str]  # Path to the final saved solution
 
-def load_problem_statement(state: BruteForceState) -> BruteForceState:
+def load_problem_statement_node(state: BruteForceState) -> BruteForceState:
     """Loads the problem statement and example test cases."""
     print(f"--- Loading problem from: {state['problem_dir_path']} ---")
     problem_dir = Path(state['problem_dir_path'])
     
     problem_statement = (problem_dir / "problem_statement.md").read_text(encoding="utf-8")
     
-    examples = []
+    # Find example test cases using the test runner utility
     test_cases_dir = problem_dir / "test_cases"
-    if test_cases_dir.exists():
-        for in_file in sorted(test_cases_dir.glob("example_*.in")):
-            out_file = in_file.with_suffix(".out")
-            if out_file.exists():
-                examples.append({
-                    "input": in_file.read_text(encoding="utf-8"),
-                    "output": out_file.read_text(encoding="utf-8").strip(),
-                    "name": in_file.name
-                })
+    examples = find_test_cases(test_cases_dir)
     
     print(f"Loaded problem statement and {len(examples)} example test cases.")
     return {
@@ -47,7 +40,7 @@ def load_problem_statement(state: BruteForceState) -> BruteForceState:
         "example_test_cases": examples
     }
 
-def generate_bruteforce(state: BruteForceState) -> BruteForceState:
+def generate_bruteforce_node(state: BruteForceState) -> BruteForceState:
     """Generates initial bruteforce solution."""
     print("--- Generating initial bruteforce solution ---")
     
@@ -68,86 +61,60 @@ def generate_bruteforce(state: BruteForceState) -> BruteForceState:
     code_match = re.search(r'```(?:cpp)?\s*([\s\S]+?)\s*```', response.content)
     code = code_match.group(1).strip() if code_match else response.content.strip()
     
-    return {
-        **state,
-        "bruteforce_code": code
-    }
-
-def _save_candidate_solution(problem_dir: Path, solution_code: str, iteration: int) -> Path:
-    """Saves a candidate bruteforce solution without versioning.
-    
-    Args:
-        problem_dir: Path to the problem directory
-        solution_code: The C++ solution code to save
-        iteration: Current iteration number
-        
-    Returns:
-        Path where the candidate solution was saved
-    """
-    automation_dir = problem_dir / "automation"
-    automation_dir.mkdir(exist_ok=True)
-    
-    # Save in a candidates subdirectory
-    candidates_dir = automation_dir / "bruteForceSol" / "candidates"
-    candidates_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Save with iteration number
-    candidate_path = candidates_dir / f"candidate_iteration_{iteration}.cpp"
-    candidate_path.write_text(solution_code, encoding="utf-8")
-    
-    return candidate_path
-
-def test_bruteforce(state: BruteForceState) -> BruteForceState:
-    """Tests the bruteforce solution against example cases."""
-    print("--- Testing bruteforce against examples ---")
-    failures = []
-    
-    # Save the current candidate solution
+    # Save the generated solution
     problem_dir = Path(state['problem_dir_path'])
     iteration = state.get("iteration_count", 0)
-    candidate_path = _save_candidate_solution(problem_dir, state["bruteforce_code"], iteration)
-    print(f"Saved candidate solution to: {candidate_path}")
+    solution_path = _save_bruteforce_solution(problem_dir, code, iteration)
+    print(f"Saved solution version {iteration} to: {solution_path}")
+    
+    return {
+        **state,
+        "bruteforce_code": code,
+        "final_bruteforce_path": str(solution_path)
+    }
+
+def test_bruteforce_node(state: BruteForceState) -> BruteForceState:
+    """Tests the bruteforce solution against example cases."""
+    print("--- Testing bruteforce against examples ---")
+    
+    problem_dir = Path(state['problem_dir_path'])
+    paths = get_problem_paths(str(problem_dir))
     
     if not state["example_test_cases"]:
         print("Warning: No example test cases found to validate against.")
         return {
             **state,
             "test_failures": [],
-            "iteration_count": iteration + 1
+            "final_verdict": "SUCCESS"  # No tests to run, consider it a success
         }
 
-    for i, example in enumerate(state["example_test_cases"]):
-        print(f"  Running example #{i+1} ({example['name']})...")
-        
-        passed, actual_output = run_single_test(
-            solution_code=state["bruteforce_code"],
-            input_data=example["input"]
-        )
-        
-        actual_output_stripped = actual_output.strip()
-
-        if not passed or actual_output_stripped != example["output"]:
-            failures.append({
-                "example_number": i + 1,
-                "input": example["input"],
-                "expected_output": example["output"],
-                "actual_output": actual_output_stripped
-            })
+    # Run tests using the test runner utility
+    failures = run_tests(
+        solution_code=state["bruteforce_code"],
+        test_cases=state["example_test_cases"]
+    )
     
     if failures:
         print(f"--- Test FAILED on {len(failures)} examples. ---")
+        # Save failures to a JSON file
+        iteration = state.get("iteration_count", 0)
+        failures_path = paths.bruteforce_dir / f"bruteforceSolution_v{iteration}_failures.json"
+        failures_path.write_text(json.dumps(failures, indent=2), encoding="utf-8")
     else:
         print("--- All examples PASSED. ---")
+        # Copy successful solution to solution_bf.cpp
+        paths.bruteforce_solution.write_text(state["bruteforce_code"], encoding="utf-8")
+        print(f"Copied successful solution to: {paths.bruteforce_solution}")
         
     return {
         **state,
         "test_failures": failures,
-        "iteration_count": iteration + 1
+        "final_verdict": "SUCCESS" if not failures else None
     }
 
-def refine_bruteforce(state: BruteForceState) -> BruteForceState:
-    """Refines the bruteforce solution based on test failures."""
-    print(f"--- Refining bruteforce solution (Attempt #{state['iteration_count']}) ---")
+def refine_bruteforce_node(state: BruteForceState) -> BruteForceState:
+    """Refines the bruteforce solution based on test failures and user feedback."""
+    print("--- Refining bruteforce solution ---")
     
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
@@ -158,84 +125,67 @@ def refine_bruteforce(state: BruteForceState) -> BruteForceState:
     prompt_path = Path(__file__).parent.parent / "prompts" / "refine_bruteforce_from_examples.txt"
     prompt_template = prompt_path.read_text(encoding="utf-8")
     
+    # Load previous failures if available
+    problem_dir = Path(state['problem_dir_path'])
+    prev_version = state.get("iteration_count", 0) - 1
+    failures_path = problem_dir / "automation" / "bruteForceSol" / f"bruteforceSolution_v{prev_version}_failures.json"
+    
+    if failures_path.exists():
+        failures = json.loads(failures_path.read_text(encoding="utf-8"))
+        print(f"Loaded test failures from previous version {prev_version}")
+    else:
+        failures = []
+        print("No previous test failures found")
+    
     chain = ChatPromptTemplate.from_template(prompt_template) | llm
     response = chain.invoke({
         "problem_statement": state["problem_statement"],
         "bruteforce_code": state["bruteforce_code"],
-        "test_failures": json.dumps(state["test_failures"], indent=2)
+        "test_failures": json.dumps(failures, indent=2),
+        "user_feedback": state.get("human_feedback", "")
     })
     
     code_match = re.search(r'```(?:cpp)?\s*([\s\S]+?)\s*```', response.content)
     code = code_match.group(1).strip() if code_match else response.content.strip()
     
+    # Save the refined solution
+    iteration = state.get("iteration_count", 0)
+    solution_path = _save_bruteforce_solution(problem_dir, code, iteration)
+    print(f"Saved solution version {iteration} to: {solution_path}")
+    
     return {
         **state,
-        "bruteforce_code": code
+        "bruteforce_code": code,
+        "final_bruteforce_path": str(solution_path)
     }
 
-def _save_bruteforce_solution(problem_dir: Path, solution_code: str) -> Tuple[int, Path]:
-    """Saves the bruteforce solution to disk and returns the version number and file path.
+def _save_bruteforce_solution(problem_dir: Path, solution_code: str, version: int) -> Path:
+    """Saves the bruteforce solution with specified version number.
     
     Args:
         problem_dir: Path to the problem directory
         solution_code: The C++ solution code to save
+        version: Version number to use for the file
         
     Returns:
-        Tuple containing:
-        - The version number of the saved solution
-        - The path where the solution was saved
+        Path where the solution was saved
     """
     automation_dir = problem_dir / "automation"
     automation_dir.mkdir(exist_ok=True)
     
-    # Load or create settings
+    # Save solution
+    bf_dir = automation_dir / "bruteForceSol"
+    bf_dir.mkdir(parents=True, exist_ok=True)
+    solution_path = bf_dir / f"bruteforceSolution_v{version}.cpp"
+    solution_path.write_text(solution_code, encoding="utf-8")
+    
+    # Update settings
     settings_path = automation_dir / "automation_settings.json"
     if settings_path.exists():
         settings = json.loads(settings_path.read_text(encoding="utf-8"))
     else:
-        settings = {"bruteforceSolutionVersion": -1}
-    
-    # Increment version
-    version_key = "bruteforceSolutionVersion"
-    new_version = settings.get(version_key, -1) + 1
-    file_prefix = version_key.replace("Version", "")
-    
-    # Save solution
-    bf_dir = automation_dir / "bruteForceSol"
-    bf_dir.mkdir(parents=True, exist_ok=True)
-    final_path = bf_dir / f"{file_prefix}_v{new_version}.cpp"
-    final_path.write_text(solution_code, encoding="utf-8")
-    
-    # Update settings
-    settings[version_key] = new_version
+        settings = {}
+    settings["bruteforceSolutionVersion"] = version
     settings_path.write_text(json.dumps(settings, indent=4), encoding="utf-8")
     
-    return new_version, final_path
-
-def save_solution(state: BruteForceState) -> BruteForceState:
-    """Saves the final bruteforce solution."""
-    print("--- Saving final bruteforce solution ---")
-    
-    # Save the solution and get version info
-    problem_dir = Path(state['problem_dir_path'])
-    new_version, final_path = _save_bruteforce_solution(problem_dir, state["bruteforce_code"])
-    
-    print(f"Saved new version {new_version} to: {final_path}")
-    return {
-        **state,
-        "final_verdict": "SUCCESS",
-        "final_bruteforce_path": str(final_path)
-    }
-
-def should_refine(state: BruteForceState) -> str:
-    """Decision node: determines if we should continue refining."""
-    print("--- Decision: Should Refine Bruteforce? ---")
-    if state["test_failures"]:
-        if state["iteration_count"] >= state["max_iterations"]:
-            print(f"  -> Verdict: FAILED. Max iterations ({state['max_iterations']}) reached.")
-            return "end_failure"
-        print(f"  -> Verdict: FAILED. Continuing to refinement loop.")
-        return "refine"
-    else:
-        print("  -> Verdict: PASSED. Proceed to save.")
-        return "save" 
+    return solution_path

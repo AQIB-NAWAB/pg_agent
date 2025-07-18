@@ -119,8 +119,15 @@ def run_solution_on_test_case(solution_path: str, input_file: Path, time_limit: 
             print(f"Solution run failed with stderr:\n{stderr}")
         return timed_out, stdout
 
-def run_single_test(solution_code: str, input_data: str) -> (bool, str):
-    """Runs a single piece of code (as a string) against a single input string."""
+def run_single_test(solution_code: str, input_data: str) -> Tuple[bool, str, str]:
+    """Runs a single piece of code (as a string) against a single input string.
+    
+    Returns:
+        Tuple containing:
+        - success: True if compilation and execution succeeded
+        - output: stdout from the program (or compilation error)
+        - error: stderr from compilation/execution
+    """
     with tempfile.TemporaryDirectory() as temp_dir:
         work_dir = Path(temp_dir)
         (work_dir / "solution.cpp").write_text(solution_code)
@@ -128,4 +135,4 @@ def run_single_test(solution_code: str, input_data: str) -> (bool, str):
         status_code, stdout, stderr = _run_command_in_container(DOCKER_IMAGE_TAG, command, work_dir, input_data=input_data.encode('utf-8'))
         if status_code != 0:
             print(f"run_single_test failed with stderr:\n{stderr}")
-        return status_code == 0, stdout
+        return status_code == 0, stdout, stderr

@@ -152,7 +152,7 @@ def refine_bruteforce(state: BruteForceState) -> BruteForceState:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OPENAI_API_KEY not found in environment.")
-    llm = ChatOpenAI(model="o4-mini", api_key=api_key)
+    llm = ChatOpenAI(model="o3", api_key=api_key)
     
     # Load prompt template from file
     prompt_path = Path(__file__).parent.parent / "prompts" / "refine_bruteforce_from_examples.txt"

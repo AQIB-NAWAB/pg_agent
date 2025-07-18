@@ -22,7 +22,7 @@ class ProblemDefinitionState(TypedDict):
 def get_llm_client():
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key: raise ValueError("OPENAI_API_KEY not found in environment.")
-    return ChatOpenAI(model="o4-mini", api_key=api_key)
+    return ChatOpenAI(model="o3", api_key=api_key)
 
 def generate_problem_statement(state: dict) -> dict:
     """Generate initial problem statement."""

@@ -7,12 +7,12 @@ from pathlib import Path
 from dotenv import load_dotenv
 from langgraph.graph import StateGraph, END
 
-from pg_agent.nodes.test_generator_nodes import (
+from pg_agent.nodes.manual_tests_nodes import (
     SimpleTestGenerationState,
     generate_simple_test_cases,
 )
 from pg_agent.utils.logging import setup_logging
-from pg_agent.utils.structure import get_default_problem_dir
+from pg_agent.utils.structure import get_default_problem_dir, get_problem_paths
 
 def build_test_cases_creator_graph() -> StateGraph:
     """Builds a minimal graph that only generates example test cases."""
@@ -41,6 +41,10 @@ def main():
     parser.add_argument("--verbose", action="store_true",
                        help="Enable verbose logging output")
     
+    # Add parse flag
+    parser.add_argument("--parse", action="store_true",
+                       help="Parse tests from latest raw response instead of generating new ones")
+    
     args = parser.parse_args()
 
     # Setup logging based on verbosity
@@ -49,21 +53,23 @@ def main():
     if not args.problem_dir:
         parser.error("No problem directory specified and could not read default from settings")
 
-    problem_dir = Path(args.problem_dir)
-    problem_statement_path = problem_dir / "problem_statement.md"
-    
-    if not problem_statement_path.exists():
-        print(f"Error: Problem statement not found at {problem_statement_path}")
+    # Get problem paths and verify problem statement exists
+    paths = get_problem_paths(args.problem_dir)
+    if not args.parse and not paths.problem_statement.exists():
+        print(f"Error: Problem statement not found at {paths.problem_statement}")
         sys.exit(1)
 
-    # Read the existing problem statement
-    problem_statement = problem_statement_path.read_text(encoding="utf-8")
+    # Read the existing problem statement if not in parse-only mode
+    problem_statement = ""
+    if not args.parse:
+        problem_statement = paths.problem_statement.read_text(encoding="utf-8")
 
     # Prepare initial state with only the required fields for test case generation
     initial_state: SimpleTestGenerationState = {
-        "output_dir": str(problem_dir),
+        "output_dir": str(paths.root),
         "problem_statement": problem_statement,
-        "test_cases": []
+        "test_cases": [],
+        "parse_only": args.parse
     }
 
     # Run the workflow
@@ -72,7 +78,7 @@ def main():
         final_state = graph.invoke(initial_state)
         print("\n--- Workflow Finished ---")
         if final_state.get("test_cases"):
-            print(f"Generated {len(final_state['test_cases'])} test cases successfully in: {problem_dir}/test_cases/")
+            print(f"Generated {len(final_state['test_cases'])} test cases successfully in: {paths.root}/test_cases/")
         else:
             print("Failed to generate test cases.")
             sys.exit(1)

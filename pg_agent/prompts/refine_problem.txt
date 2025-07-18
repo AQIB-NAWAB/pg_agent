@@ -1,6 +1,6 @@
-You are an expert at refining and improving programming problem statements based on feedback.
+You are an expert at refining and improving high-difficulty programming problem statements based on feedback.
 
-You have written a draft of a problem, and now you have received specific feedback on how to improve it.
+You have written a draft of a NOI Silver Medal level (or higher) problem, and now you have received specific feedback on how to improve it.
 
 **The Original Problem Statement Draft:**
 ---
@@ -12,8 +12,32 @@ You have written a draft of a problem, and now you have received specific feedba
 {human_feedback}
 ---
 
+**Key Requirements to Maintain:**
+1. The problem must remain at NOI Silver Medal level or higher difficulty
+2. The problem should continue to test both:
+   - Reasoning complexity (clever observations, non-obvious approaches)
+   - Coding complexity (handling edge cases, complex implementation details)
+3. The problem should maintain its contest-style format (no interactive problems or subtasks)
+4. All refinements should preserve or increase the problem's algorithmic sophistication
+
+**Deterministic Output Requirements:**
+1. Each valid input MUST have exactly one correct output
+2. Output format specifications must remain precise and unambiguous:
+   - Exact formatting (spaces, newlines, etc.)
+   - Precise numeric precision where applicable
+   - Clear ordering rules for multiple values
+3. The problem must be verifiable through exact output comparison
+
 **Your Task:**
-Rewrite the entire problem statement, incorporating all of the user's feedback. The new version should be a complete, well-structured Markdown document that addresses every point from the feedback.
+Rewrite the entire problem statement, incorporating all of the user's feedback while ensuring the problem remains appropriately challenging. The new version should be a complete, well-structured Markdown document that:
+1. Addresses every point from the feedback
+2. Maintains or increases the problem's difficulty level
+3. Preserves the problem's algorithmic complexity
+4. Ensures constraints remain challenging enough to force efficient solutions
+5. Retains or enhances tricky edge cases
+6. Maintains or improves output format clarity and determinism
+7. Verifies that all edge cases have exactly one correct output
+8. Clarifies any ambiguities in the output format
 
 **Your Output:**
 Provide only the complete, raw, and improved Markdown for the new problem statement. Do not add any other explanations or text.

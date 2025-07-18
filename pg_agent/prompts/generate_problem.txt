@@ -1,23 +1,60 @@
-You are an expert at creating engaging and well-defined competitive programming problems.
+You are an expert at creating challenging and well-defined competitive programming problems at the NOI Silver Medal level or higher difficulty.
 
-Your task is to generate a complete problem statement based on the provided context.
+Your task is to generate a complete problem statement based on the provided context, ensuring it meets high difficulty standards.
 
 **Context Provided:**
 - Topics: {topics}
 - A Previous Problem (for inspiration and to ensure variety): {previous_problem}
 - A Specific User Idea: {user_prompt}
 
+**Difficulty Requirements:**
+1. The problem should be at NOI Silver Medal level or higher (equivalent to hard problems in CodeForces Div1/Div2)
+2. The solution should require sophisticated algorithmic knowledge and implementation skills
+3. The problem should test both:
+   - Reasoning complexity (clever observations, non-obvious approaches)
+   - Coding complexity (handling edge cases, complex implementation details)
+
+**Problem Type Requirements:**
+1. Create a standard contest-style problem (no interactive problems or subtasks)
+2. The problem should require a combination of:
+   - Advanced algorithmic concepts
+   - Careful implementation
+   - Optimization techniques
+   - Edge case handling
+
+**Deterministic Requirements:**
+1. The problem must be defined such that each valid input has EXACTLY ONE correct output
+2. All output specifications must be precise and unambiguous:
+   - For numeric output: specify exact precision (e.g., "Print exactly 6 decimal places")
+   - For string output: specify exact format (e.g., "Print YES or NO in uppercase")
+   - For multiple answers: specify exact ordering (e.g., "Print in ascending order")
+3. The output format must allow for exact string comparison between solution output and reference output
+
 **Your Requirements:**
-1.  Create a programming problem that is clear, unambiguous, and of medium difficulty.
-2.  If a `previous_problem` is provided, ensure the new problem is a distinct variation or a different challenge within the same topic area. Do not simply copy it.
-3.  If a `user_prompt` is provided, it is the most important instruction. Prioritize fulfilling the user's specific idea.
-4.  The generated problem statement **must** be in Markdown format and include all of the following sections:
-    - A clear and engaging problem title (e.g., `# My Problem Title`).
-    - A 1-2 paragraph story or description of the problem.
-    - A section titled `## Input Format` that describes the stdin format precisely.
-    - A section titled `## Output Format` that describes the stdout format precisely.
-    - A section titled `## Constraints` that lists all constraints on the input values (e.g., `1 <= N <= 1000`).
-    - A section titled `## Example` with at least one simple example, including both input and output.
+1. Create a programming problem that is challenging yet well-defined
+2. If a `previous_problem` is provided, ensure the new problem is substantially different
+3. If a `user_prompt` is provided, it is the most important instruction
+4. The generated problem statement **must** be in Markdown format and include:
+    - A clear and engaging problem title (e.g., `# My Problem Title`)
+    - A 1-2 paragraph story or description that naturally introduces the complexity
+    - A section titled `## Input Format` that describes the stdin format precisely
+    - A section titled `## Output Format` that describes the stdout format precisely, with:
+      - Exact formatting requirements (spaces, newlines, etc.)
+      - Precise numeric precision if applicable
+      - Clear ordering requirements for multiple values
+    - A section titled `## Constraints` that lists all constraints, pushing limits to ensure difficulty
+    - A section titled `## Example` with at least two examples:
+      - One simple example to illustrate the basic concept
+      - One sophisticated example demonstrating the problem's complexity
+    - A section titled `## Notes` explaining any special considerations or hints (optional)
+
+**Additional Guidelines:**
+1. Ensure constraints are large enough to force efficient solutions
+2. Include tricky edge cases in the problem design
+3. The problem should require careful analysis and optimization
+4. Avoid problems that can be solved with straightforward implementations
+5. Ensure all edge cases have deterministic outputs
+6. If multiple valid outputs are possible, provide clear rules for choosing one
 
 **Your Output:**
 Provide only the complete, raw Markdown for the problem statement. Do not add any other explanations or text.

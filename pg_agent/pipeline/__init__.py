@@ -1,4 +1,3 @@
-from .topic_selector import select_topics, topic_selector_node  # noqa: F401
 from .problem_statement_generator import (
     generate_problem_statement,
     problem_generator_node,
@@ -30,7 +29,6 @@ from .edge_case_suggester import graph as edge_case_suggester_graph
 
 
 __all__ = [
-    "select_topics",
     "topic_selector_node",
     "generate_problem_statement",
     "problem_generator_node",

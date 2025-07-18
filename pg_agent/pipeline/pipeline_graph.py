@@ -4,12 +4,12 @@ from operator import add
 from langgraph.graph import StateGraph, END, START
 from langgraph.graph.message import add_messages
 
-from .topic_selector import topic_selector_node
 from .problem_statement_generator import problem_generator_node
 from .test_case_generator import case_generator_node
 from .solution_generator import solution_generator_node
 from .evaluation_code_generator import evaluation_code_generator_node
 from .evaluation_runner import evaluation_runner_node
+from pg_agent.nodes.topic_selector import topic_selector_node
 
 # from .evaluation_runner import evaluation_runner_node  # unused for now
 

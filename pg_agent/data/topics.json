@@ -1,5 +1,8 @@
 {
     "data_structures": {
+        "general": [
+            "Data Structures"
+        ],
         "linear": [
             "Arrays",
             "Strings",
@@ -9,6 +12,7 @@
             "Deques"
         ],
         "trees": [
+            "Trees",
             "Binary Trees",
             "Binary Search Trees (BST)",
             "Heaps (Min/Max Priority Queue)",
@@ -19,11 +23,13 @@
             "Red-Black Trees"
         ],
         "graphs": [
+            "Graphs",
             "Adjacency List/Matrix Representation",
             "Implicit Graphs",
             "Directed Acyclic Graphs (DAG)"
         ],
         "hashing": [
+            "Hashing",
             "Hash Tables / Hash Maps",
             "Rolling Hash",
             "String Hashing",
@@ -38,7 +44,15 @@
         ]
     },
     "algorithms": {
+        "general": [
+            "Dynamic Programming",
+            "Greedy Algorithms",
+            "Divide and Conquer",
+            "Recursion",
+            "Backtracking"
+        ],
         "sorting_and_searching": [
+            "Sorting and Searching",
             "Quicksort",
             "Mergesort",
             "Heapsort",
@@ -49,6 +63,9 @@
             "Meet in the Middle"
         ],
         "graph_algorithms": {
+            "general": [
+                "Network Flow"
+            ],
             "traversal": [
                 "Breadth-First Search (BFS)",
                 "Depth-First Search (DFS)",
@@ -74,6 +91,7 @@
             ]
         },
         "dynamic_programming": [
+            "Dynamic Programming",
             "Knapsack (0/1, Unbounded, Fractional)",
             "Longest Common Subsequence (LCS)",
             "Longest Increasing Subsequence (LIS)",
@@ -86,6 +104,7 @@
             "Bitmask DP"
         ],
         "string_algorithms": [
+            "Strings",
             "Knuth-Morris-Pratt (KMP)",
             "Z-Algorithm",
             "Aho-Corasick",
@@ -95,11 +114,11 @@
             "Suffix Automaton"
         ],
         "backtracking_and_branch_bound": [
+            "Backtracking",
             "Permutations and Combinations",
             "N-Queens Problem",
             "Sudoku Solver",
-            "Traveling Salesperson Problem (TSP)",
-            "Backtracking"
+            "Traveling Salesperson Problem (TSP)"
         ],
         "constructive": [
             "Constructive Algorithms",
@@ -121,25 +140,37 @@
         "2-SAT"
     ],
     "domains": {
-        "mathematics": [
-            "Number Theory (GCD, LCM, Primality Testing, Sieve of Eratosthenes)",
-            "Combinatorics (nCr, Catalan Numbers)",
-            "Probability",
-            "Modular Arithmetic (Modular Inverse, Chinese Remainder Theorem)",
-            "Matrix Exponentiation",
-            "Fast Fourier Transform (FFT)",
-            "Math",
-            "Bit Manipulation",
-            "FFT/NTT"
-        ],
-        "computational_geometry": [
-            "Convex Hull (Graham Scan, Monotone Chain)",
-            "Line Sweep Algorithms",
-            "Closest Pair of Points",
-            "Point in Polygon",
-            "Line Segment Intersection",
-            "Geometry"
-        ],
+        "mathematics": {
+            "general": [
+                "Math",
+                "Number Theory",
+                "Combinatorics",
+                "Probability"
+            ],
+            "topics": [
+                "Number Theory (GCD, LCM, Primality Testing, Sieve of Eratosthenes)",
+                "Combinatorics (nCr, Catalan Numbers)",
+                "Probability",
+                "Modular Arithmetic (Modular Inverse, Chinese Remainder Theorem)",
+                "Matrix Exponentiation",
+                "Fast Fourier Transform (FFT)",
+                "FFT/NTT",
+                "Bit Manipulation",
+                "Game Theory"
+            ]
+        },
+        "computational_geometry": {
+            "general": [
+                "Geometry"
+            ],
+            "topics": [
+                "Convex Hull (Graham Scan, Monotone Chain)",
+                "Line Sweep Algorithms",
+                "Closest Pair of Points",
+                "Point in Polygon",
+                "Line Segment Intersection"
+            ]
+        },
         "interactive": [
             "Interactive Problems"
         ]

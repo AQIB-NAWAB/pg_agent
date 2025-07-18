@@ -77,7 +77,8 @@ def main():
 
     # If no topics provided and not using idea or refine mode, select random topics
     if not any([args.topics, args.idea, args.refine]):
-        args.topics = select_random_topics()
+        topics_list = select_random_topics()
+        args.topics = ", ".join(topics_list)
         print(f"No topics specified. Using randomly selected topics: '{args.topics}'")
 
     # Prepare initial state with all required fields from ProblemDefinitionState

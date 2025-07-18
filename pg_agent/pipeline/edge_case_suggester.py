@@ -35,7 +35,7 @@ from pg_agent.prompts.edge_case_suggester import (
     EDGE_CASE_GENERATOR_PROMPT,
 )
 from pg_agent.pipeline.problem_statement_generator import problem_generator_node
-from pg_agent.pipeline.topic_selector import topic_selector_node
+from pg_agent.nodes.topic_selector import topic_selector_node
 
 # Ensure env vars such as OPENAI_API_KEY are loaded if a .env file exists.
 load_dotenv()

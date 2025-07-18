@@ -6,15 +6,15 @@ import logging
 from pathlib import Path
 from typing import List
 
-def select_random_topics() -> str:
+def select_random_topics() -> List[str]:
     """Select 1-2 random topics from the topics.json file.
     
     Returns:
-        str: Comma-separated list of selected topics
+        List[str]: List of selected topics
     
     Example:
         >>> select_random_topics()
-        'Dynamic Programming, Trees'
+        ['Dynamic Programming', 'Trees']
     """
     try:
         # Look for topics.json in pg_agent/data directory
@@ -39,14 +39,13 @@ def select_random_topics() -> str:
         
         # Select 1-2 random topics
         selected_topics = random.sample(all_topic_choices, k=random.randint(1, 2))
-        topics = ", ".join(selected_topics)
-        logging.info(f"Selected topics: '{topics}'")
-        return topics
+        logging.info(f"Selected topics: {selected_topics}")
+        return selected_topics
         
     except Exception as e:
         logging.error(f"Error selecting random topics: {str(e)}")
         # Return some default topics as fallback
-        return "Dynamic Programming, Data Structures"
+        return ["Dynamic Programming", "Data Structures"]
 
 def topic_selector_node(state):
     """LangGraph node: selects topics and adds them to the state."""

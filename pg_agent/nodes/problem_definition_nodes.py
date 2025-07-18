@@ -5,6 +5,7 @@ from typing import TypedDict, Optional, List, Tuple
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from ..utils.parsing import parse_test_cases
+from ..utils.structure import get_problem_paths
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +35,9 @@ def generate_problem_statement(state: dict) -> dict:
         "user_prompt": state.get("user_prompt") or "None",
     })
     
-    # Save the problem statement
-    problem_path = Path(state['output_dir']) / "problem_statement.md"
-    problem_path.write_text(response.content, encoding="utf-8")
+    # Save the problem statement using ProblemPaths
+    paths = get_problem_paths(state['output_dir'])
+    paths.problem_statement.write_text(response.content, encoding="utf-8")
     
     return {"problem_statement": response.content}
 
@@ -48,12 +49,14 @@ def refine_problem_statement(state: dict) -> dict:
         
     logger.info("Refining problem statement based on human feedback")
     
+    # Get paths for the problem directory
+    paths = get_problem_paths(state['output_dir'])
+    
     # If problem_statement is not in state, read it from file
     problem_statement = state.get("problem_statement")
     if not problem_statement:
-        problem_path = Path(state['output_dir']) / "problem_statement.md"
-        if problem_path.exists():
-            problem_statement = problem_path.read_text(encoding="utf-8")
+        if paths.problem_statement.exists():
+            problem_statement = paths.problem_statement.read_text(encoding="utf-8")
         else:
             raise ValueError("No problem statement found to refine. Make sure problem_statement.md exists in the output directory.")
     
@@ -66,9 +69,8 @@ def refine_problem_statement(state: dict) -> dict:
     })
     
     # Save the refined problem statement
-    problem_path = Path(state['output_dir']) / "problem_statement.md"
-    problem_path.write_text(response.content, encoding="utf-8")
-    logger.info("Saved refined problem statement to %s", problem_path)
+    paths.problem_statement.write_text(response.content, encoding="utf-8")
+    logger.info("Saved refined problem statement to %s", paths.problem_statement)
     
     return {"problem_statement": response.content}
 
@@ -91,14 +93,14 @@ def extract_examples(state: dict) -> dict:
     else:
         logger.info("Extracted %d test cases from problem statement", len(test_cases))
 
-    # Save the test cases
-    test_cases_dir = Path(state['output_dir']) / "test_cases"
-    test_cases_dir.mkdir(exist_ok=True)
-    for f in test_cases_dir.glob("example_*"):
+    # Save the test cases using ProblemPaths
+    paths = get_problem_paths(state['output_dir'])
+    paths.test_cases.mkdir(exist_ok=True)
+    for f in paths.test_cases.glob("example_*"):
         f.unlink()
     for i, (input_data, output_data) in enumerate(test_cases, 1):
-        input_path = test_cases_dir / f"example_{i}.in"
-        output_path = test_cases_dir / f"example_{i}.out"
+        input_path = paths.test_cases / f"example_{i}.in"
+        output_path = paths.test_cases / f"example_{i}.out"
         input_path.write_text(input_data, encoding="utf-8")
         output_path.write_text(output_data, encoding="utf-8")
         logger.info("Saved test case %d to %s and %s", i, input_path, output_path)

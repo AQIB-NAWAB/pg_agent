@@ -30,6 +30,11 @@ Your task is to generate a complete problem statement based on the provided cont
    - For multiple answers: specify exact ordering (e.g., "Print in ascending order")
 3. The output format must allow for exact string comparison between solution output and reference output
 
+**Markdown Format Requirements:**
+Use proper markdown for all mathematical expressions:
+   - Inline math: `$n$` for variables, `$1 \leq n \leq 10^5$` for constraints
+   - Display math: `$$` for multi-line equations
+
 **Your Requirements:**
 1. Create a programming problem that is challenging yet well-defined
 2. If a `previous_problem` is provided, ensure the new problem is substantially different
@@ -43,9 +48,10 @@ Your task is to generate a complete problem statement based on the provided cont
       - Precise numeric precision if applicable
       - Clear ordering requirements for multiple values
     - A section titled `## Constraints` that lists all constraints, pushing limits to ensure difficulty
-    - A section titled `## Example` with at least two examples:
+    - A section titled `## Examples` with at least two examples:
       - One simple example to illustrate the basic concept
       - One sophisticated example demonstrating the problem's complexity
+      - Each example must include input, output, and explanation
     - A section titled `## Notes` explaining any special considerations or hints (optional)
 
 **Additional Guidelines:**

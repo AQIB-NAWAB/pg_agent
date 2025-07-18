@@ -28,6 +28,11 @@ You have written a draft of a NOI Silver Medal level (or higher) problem, and no
    - Clear ordering rules for multiple values
 3. The problem must be verifiable through exact output comparison
 
+**Markdown Format Requirements:**
+Use proper markdown for all mathematical expressions:
+   - Inline math: `$n$` for variables, `$1 \leq n \leq 10^5$` for constraints
+   - Display math: `$$` for multi-line equations
+
 **Your Task:**
 Rewrite the entire problem statement, incorporating all of the user's feedback while ensuring the problem remains appropriately challenging. The new version should be a complete, well-structured Markdown document that:
 1. Addresses every point from the feedback
@@ -38,6 +43,8 @@ Rewrite the entire problem statement, incorporating all of the user's feedback w
 6. Maintains or improves output format clarity and determinism
 7. Verifies that all edge cases have exactly one correct output
 8. Clarifies any ambiguities in the output format
+9. Uses proper markdown formatting for all mathematical expressions and examples
+10. Follows the exact markdown structure specified in the format requirements
 
 **Your Output:**
 Provide only the complete, raw, and improved Markdown for the new problem statement. Do not add any other explanations or text.

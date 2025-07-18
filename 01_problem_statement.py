@@ -64,6 +64,9 @@ def main():
     mode_group.add_argument("--idea", help="Create a problem from an initial problem idea or concept")
     mode_group.add_argument("--refine", help="Refine an existing problem statement with feedback")
     
+    # Add original problem argument
+    parser.add_argument("--original", help="Path to an original problem to use as inspiration")
+    
     # Add verbose flag
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging output")
     
@@ -81,13 +84,22 @@ def main():
         args.topics = ", ".join(topics_list)
         print(f"No topics specified. Using randomly selected topics: '{args.topics}'")
 
+    # Load original problem if specified
+    previous_problem = None
+    if args.original:
+        try:
+            with open(args.original, 'r', encoding='utf-8') as f:
+                previous_problem = f.read()
+        except Exception as e:
+            parser.error(f"Failed to read original problem file: {str(e)}")
+
     # Prepare initial state with all required fields from ProblemDefinitionState
     initial_state: ProblemDefinitionState = {
         "output_dir": os.path.abspath(args.output_dir),
         "topics": args.topics,
         "user_prompt": args.idea,
         "human_feedback": args.refine,
-        "previous_problem": None,
+        "previous_problem": previous_problem,
         "problem_statement": "",
         "test_cases": [],
     }

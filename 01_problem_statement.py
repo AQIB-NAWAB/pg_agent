@@ -19,6 +19,7 @@ from pg_agent.nodes.problem_definition_nodes import (
 )
 from pg_agent.utils.logging import setup_logging
 from pg_agent.utils.structure import get_default_problem_dir
+from pg_agent.nodes.topic_selector import select_random_topics
 
 def build_refine_graph() -> StateGraph:
     """Builds the graph for refining an existing problem."""
@@ -73,6 +74,11 @@ def main():
 
     if not args.output_dir:
         parser.error("No output directory specified and could not read default from settings")
+
+    # If no topics provided and not using idea or refine mode, select random topics
+    if not any([args.topics, args.idea, args.refine]):
+        args.topics = select_random_topics()
+        print(f"No topics specified. Using randomly selected topics: '{args.topics}'")
 
     # Prepare initial state with all required fields from ProblemDefinitionState
     initial_state: ProblemDefinitionState = {

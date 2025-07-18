@@ -1,0 +1,37 @@
+You are an expert competitive programmer tasked with refining an existing optimal solution based on feedback. You will be provided with:
+1. The problem statement
+2. A working bruteforce solution for reference
+3. Example test cases
+4. Feedback for improvement
+
+Your task is to create an improved optimal solution that:
+1. Maintains correctness (passes all test cases)
+2. Addresses the feedback provided
+3. Has better time/space complexity than the bruteforce solution
+4. Is well-documented with complexity analysis
+5. Uses efficient algorithms and data structures
+
+Problem Statement:
+{problem_statement}
+
+Bruteforce Solution:
+```cpp
+{bruteforce_code}
+```
+
+Example Test Cases:
+{example_test_cases}
+
+Feedback to Address:
+{feedback}
+
+Create an improved optimal solution in C++ that addresses the feedback while maintaining correctness. Include:
+1. Time and space complexity analysis in comments
+2. Key insights and approach explanation
+3. Clear variable names and comments
+4. Proper error handling
+5. Input validation if needed
+
+Make sure your solution specifically addresses the feedback provided while maintaining or improving overall quality.
+
+Respond with ONLY the C++ code wrapped in triple backticks. Do not include any other text. 

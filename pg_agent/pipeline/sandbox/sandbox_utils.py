@@ -7,6 +7,9 @@ import shutil
 import subprocess
 from typing import List, Dict, Tuple
 
+# Use a versioned tag to avoid rebuilding unnecessarily
+DOCKER_IMAGE_TAG = "pg-agent/cpp-sandbox:1.0"
+
 def _build_image_if_not_exists(client: docker.DockerClient, image_tag: str):
     """Checks if the image exists locally and builds it if it doesn't."""
     try:
@@ -16,7 +19,7 @@ def _build_image_if_not_exists(client: docker.DockerClient, image_tag: str):
         sandbox_dir = Path(__file__).parent
         try:
             client.images.build(path=str(sandbox_dir), tag=image_tag, rm=True)
-            print("Build successful.")
+            print(f"Build successful. Image tag: {image_tag}")
         except docker.errors.BuildError as e:
             print(f"FATAL: Docker build failed: {e}")
             raise
@@ -46,7 +49,7 @@ def run_generator_script(script_path: str, output_dir: Path):
     work_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy(script_path, work_dir / "generator.cpp")
     command = "g++ -std=c++14 -O2 -o generator generator.cpp && ./generator"
-    status_code, stdout, stderr = _run_command_in_container("cpp-validator-sandbox", command, work_dir)
+    status_code, stdout, stderr = _run_command_in_container(DOCKER_IMAGE_TAG, command, work_dir)
     if status_code != 0:
         raise Exception(f"Generator script failed:\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}")
 
@@ -63,7 +66,7 @@ def run_validation_suite(validator_path: str, all_input_files: List[Path]) -> Tu
         os.chmod(work_dir / "runner.sh", 0o755)
 
         command = "/bin/bash runner.sh validate_suite"
-        status_code, stdout, stderr = _run_command_in_container("cpp-validator-sandbox", command, work_dir)
+        status_code, stdout, stderr = _run_command_in_container(DOCKER_IMAGE_TAG, command, work_dir)
         
         if status_code != 0:
             raise Exception(f"Validation suite execution failed:\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}")
@@ -88,7 +91,6 @@ def run_test_suite(solution_path: str, test_cases_dir: Path, time_limit: float):
     Runs a single solution against a directory of test cases efficiently.
     Compiles once, then runs all tests in a single container.
     """
-    image_tag = "cpp-validator-sandbox"
     work_dir = test_cases_dir
     
     shutil.copy(solution_path, work_dir / "solution.cpp")
@@ -97,7 +99,7 @@ def run_test_suite(solution_path: str, test_cases_dir: Path, time_limit: float):
     os.chmod(work_dir / "runner.sh", 0o755)
 
     command = f"/bin/bash runner.sh execute_suite {time_limit} solution.cpp solution_executable"
-    status_code, stdout, stderr = _run_command_in_container(image_tag, command, work_dir=work_dir)
+    status_code, stdout, stderr = _run_command_in_container(DOCKER_IMAGE_TAG, command, work_dir=work_dir)
     
     if status_code != 0:
         raise Exception(f"Test suite execution failed:\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}")
@@ -111,7 +113,7 @@ def run_solution_on_test_case(solution_path: str, input_file: Path, time_limit: 
         shutil.copy(solution_path, work_dir / "solution.cpp")
         command = f"g++ -std=c++14 -O2 -o solution solution.cpp && timeout {time_limit} ./solution"
         input_data = input_file.read_bytes()
-        status_code, stdout, stderr = _run_command_in_container("cpp-validator-sandbox", command, work_dir, input_data=input_data)
+        status_code, stdout, stderr = _run_command_in_container(DOCKER_IMAGE_TAG, command, work_dir, input_data=input_data)
         timed_out = status_code == 124
         if status_code not in [0, 124]:
             print(f"Solution run failed with stderr:\n{stderr}")
@@ -123,7 +125,7 @@ def run_single_test(solution_code: str, input_data: str) -> (bool, str):
         work_dir = Path(temp_dir)
         (work_dir / "solution.cpp").write_text(solution_code)
         command = "g++ -std=c++14 -O2 -o solution solution.cpp && ./solution"
-        status_code, stdout, stderr = _run_command_in_container("cpp-validator-sandbox", command, work_dir, input_data=input_data.encode('utf-8'))
+        status_code, stdout, stderr = _run_command_in_container(DOCKER_IMAGE_TAG, command, work_dir, input_data=input_data.encode('utf-8'))
         if status_code != 0:
             print(f"run_single_test failed with stderr:\n{stderr}")
         return status_code == 0, stdout

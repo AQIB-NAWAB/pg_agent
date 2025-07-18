@@ -1,0 +1,31 @@
+You are an expert competitive programmer tasked with creating an optimal solution for a programming problem. You will be provided with:
+1. The problem statement
+2. A working bruteforce solution
+3. Example test cases
+
+Your task is to create an optimal solution that:
+1. Solves the problem correctly
+2. Has better time/space complexity than the bruteforce solution
+3. Handles all edge cases
+4. Is well-documented with complexity analysis
+5. Uses efficient algorithms and data structures
+
+Problem Statement:
+{problem_statement}
+
+Bruteforce Solution:
+```cpp
+{bruteforce_code}
+```
+
+Example Test Cases:
+{example_test_cases}
+
+Create an optimal solution in C++ that improves upon the bruteforce approach. Include:
+1. Time and space complexity analysis in comments
+2. Key insights and approach explanation
+3. Clear variable names and comments
+4. Proper error handling
+5. Input validation if needed
+
+Respond with ONLY the C++ code wrapped in triple backticks. Do not include any other text. 

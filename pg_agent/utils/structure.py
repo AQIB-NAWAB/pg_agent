@@ -1,7 +1,38 @@
 import json
 from pathlib import Path
+from typing import Dict, Optional
 
-def get_default_problem_dir():
+class ProblemPaths:
+    """Represents the standard paths within a problem directory."""
+    def __init__(self, problem_dir: Path):
+        self.root = problem_dir
+        self.problem_statement = self.root / "problem_statement.md"
+        self.standard_solution = self.root / "standard.cpp"
+        self.automation = self.root / "automation"
+        self.automation_settings = self.automation / "automation_settings.json"
+        self.bruteforce_dir = self.automation / "bruteForceSol"
+        self.optimal_dir = self.automation / "optimalSol"
+        self.test_cases = self.root / "test_cases"
+
+    def get_bruteforce_path(self, version: int) -> Path:
+        """Gets the path for a specific version of bruteforce solution."""
+        return self.bruteforce_dir / f"bruteforceSolution_v{version}.cpp"
+
+    def get_optimal_path(self, version: int) -> Path:
+        """Gets the path for a specific version of optimal solution."""
+        return self.optimal_dir / f"optimalSolution_v{version}.cpp"
+
+    def get_settings(self) -> Dict:
+        """Reads and returns the automation settings."""
+        if not self.automation_settings.exists():
+            return {}
+        return json.loads(self.automation_settings.read_text(encoding="utf-8"))
+
+    def update_settings(self, settings: Dict) -> None:
+        """Updates the automation settings file."""
+        self.automation_settings.write_text(json.dumps(settings, indent=4), encoding="utf-8")
+
+def get_default_problem_dir() -> Optional[str]:
     """Get the default problem directory from settings."""
     settings_path = Path(__file__).parent.parent.parent / "pg_agent_settings.json"
     try:
@@ -15,4 +46,8 @@ def get_default_problem_dir():
         return default_dir
     except Exception as e:
         print(f"Warning: Could not read default problem directory from settings: {e}")
-        return None 
+        return None
+
+def get_problem_paths(problem_dir: str) -> ProblemPaths:
+    """Creates a ProblemPaths object for the given problem directory."""
+    return ProblemPaths(Path(problem_dir)) 

@@ -1,0 +1,32 @@
+You are an expert competitive programmer tasked with fixing and optimizing a solution that failed some test cases. You will be provided with:
+1. The problem statement
+2. The current solution that needs improvement
+3. Test case failures
+
+Problem Statement:
+{problem_statement}
+
+Current Solution:
+```cpp
+{current_code}
+```
+
+Test Failures:
+{test_failures}
+
+Your task is to fix the solution to:
+1. Pass all failing test cases
+2. Maintain or improve time/space complexity
+3. Handle any edge cases revealed by the failures
+4. Maintain code readability and documentation
+
+Analyze the failures carefully. Consider:
+1. Edge cases that might be missing
+2. Potential integer overflow issues
+3. Off-by-one errors
+4. Memory management issues
+5. Time complexity bottlenecks
+
+Provide an improved version of the solution that addresses the issues while maintaining or improving efficiency.
+
+Respond with ONLY the improved C++ code wrapped in triple backticks. Do not include any other text. 

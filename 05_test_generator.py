@@ -11,50 +11,45 @@ from langgraph.graph import StateGraph, END
 from pg_agent.nodes.test_generator_nodes import (
     TestCaseGeneratorState,
     load_context_node,
-    gen_small_tests_node,
-    gen_stress_tests_node,
+    gen_basic_tests_node,
+    gen_edge_tests_node,
     gen_validator_node,
 )
-from pg_agent.utils.logging import setup_logging
+from pg_agent.utils.logging import setup_logging, get_log_level
 from pg_agent.utils.structure import get_default_problem_dir
 
-def build_test_generator_graph(skip_small: bool = False, skip_stress: bool = False, skip_validator: bool = False) -> StateGraph:
+def build_test_generator_graph(mode: str = "basic") -> StateGraph:
     """Builds the graph for generating test cases and validator.
     
     Args:
-        skip_small: Whether to skip small test generation
-        skip_stress: Whether to skip stress test generation
-        skip_validator: Whether to skip validator generation
+        mode: The generation mode to use ("basic", "edge", "validator", or "all")
     """
     workflow = StateGraph(TestCaseGeneratorState)
     
     # Add nodes
     workflow.add_node("load_context", load_context_node)
-    workflow.add_node("gen_small_tests", gen_small_tests_node)
-    workflow.add_node("gen_stress_tests", gen_stress_tests_node)
+    workflow.add_node("gen_basic_tests", gen_basic_tests_node)
+    workflow.add_node("gen_edge_tests", gen_edge_tests_node)
     workflow.add_node("gen_validator", gen_validator_node)
     
-    # Define flow based on skip flags
+    # Define flow based on mode
     workflow.set_entry_point("load_context")
     
-    # Track the last node to chain the flow
-    last_node = "load_context"
+    if mode == "basic" or mode == "all":
+        workflow.add_edge("load_context", "gen_basic_tests")
+        if mode == "basic":
+            workflow.add_edge("gen_basic_tests", END)
     
-    # Add each generator if not skipped
-    if not skip_small:
-        workflow.add_edge(last_node, "gen_small_tests")
-        last_node = "gen_small_tests"
+    if mode == "edge" or mode == "all":
+        prev_node = "gen_basic_tests" if mode == "all" else "load_context"
+        workflow.add_edge(prev_node, "gen_edge_tests")
+        if mode == "edge":
+            workflow.add_edge("gen_edge_tests", END)
     
-    if not skip_stress:
-        workflow.add_edge(last_node, "gen_stress_tests")
-        last_node = "gen_stress_tests"
-    
-    if not skip_validator:
-        workflow.add_edge(last_node, "gen_validator")
-        last_node = "gen_validator"
-    
-    # Connect last node to END
-    workflow.add_edge(last_node, END)
+    if mode == "validator" or mode == "all":
+        prev_node = "gen_edge_tests" if mode == "all" else "load_context"
+        workflow.add_edge(prev_node, "gen_validator")
+        workflow.add_edge("gen_validator", END)
     
     return workflow.compile()
 
@@ -67,26 +62,34 @@ def main():
     parser.add_argument("problem_dir", nargs="?", default=default_dir,
                        help=f"Path to the problem directory (default: {default_dir})")
     
-    # Replace generator type options with skip flags
-    parser.add_argument("--skip-small", action="store_true",
-                      help="Skip generating small test cases")
-    parser.add_argument("--skip-stress", action="store_true",
-                      help="Skip generating stress test cases")
-    parser.add_argument("--skip-validator", action="store_true",
-                      help="Skip generating test case validator")
+    # Replace skip flags with mode selection
+    parser.add_argument("--mode", type=str, default="basic",
+                       choices=["basic", "edge", "validator", "all"],
+                       help="Generation mode: basic (50 tests), edge (5-10 edge cases), "
+                            "validator (test case validator), or all (run all modes)")
     
     # Add refine option with feedback
     parser.add_argument("--refine", metavar="FEEDBACK",
                        help="Refine existing generator/validator with the provided feedback")
     
-    # Add verbose flag
-    parser.add_argument("--verbose", action="store_true",
-                       help="Enable verbose logging output")
+    # Add logging control arguments
+    parser.add_argument("--log-level", type=str, default="info",
+                       choices=['debug', 'info', 'warning', 'error', 'critical'],
+                       help="Set the logging level (default: info)")
+    parser.add_argument("--quiet", action="store_true",
+                       help="Suppress all output except errors (equivalent to --log-level error)")
     
     args = parser.parse_args()
 
-    # Setup logging based on verbosity
-    setup_logging(args.verbose)
+    # Handle quiet mode and setup logging
+    if args.quiet:
+        log_level = logging.ERROR
+    else:
+        log_level = get_log_level(args.log_level)
+
+    # Setup logging with the specified level
+    setup_logging(log_level)
+    logger = logging.getLogger(__name__)
 
     if not args.problem_dir:
         parser.error("No problem directory specified and could not read default from settings")
@@ -95,14 +98,14 @@ def main():
     problem_statement_path = problem_dir / "problem_statement.md"
     
     if not problem_statement_path.exists():
-        print(f"Error: Problem statement not found at {problem_statement_path}")
+        logger.error("Problem statement not found at %s", problem_statement_path)
         sys.exit(1)
 
     # Check for bruteforce solution
     automation_dir = problem_dir / "automation"
     settings_path = automation_dir / "automation_settings.json"
     if not settings_path.exists():
-        print("Error: automation_settings.json not found. Please run bruteforce generator first.")
+        logger.error("Error: automation_settings.json not found. Please run bruteforce generator first.")
         sys.exit(1)
 
     # Prepare initial state
@@ -110,60 +113,54 @@ def main():
         "problem_dir_path": str(problem_dir),
         "problem_statement": "",  # Will be loaded by load_context
         "bruteforce_code": "",   # Will be loaded by load_context
-        "small_test_gen_path": None,
-        "stress_test_gen_path": None,
+        "basic_test_gen_path": None,
+        "edge_test_gen_path": None,
         "validator_path": None,
         "final_verdict": None,
         "refine_mode": args.refine is not None,  # True if --refine is provided
         "user_feedback": args.refine or "",  # Use feedback from --refine argument
-        "skip_small": args.skip_small,
-        "skip_stress": args.skip_stress,
-        "skip_validator": args.skip_validator
+        "generation_mode": args.mode
     }
 
     # Run the workflow
-    graph = build_test_generator_graph(
-        skip_small=args.skip_small,
-        skip_stress=args.skip_stress,
-        skip_validator=args.skip_validator
-    )
+    graph = build_test_generator_graph(mode=args.mode)
     
     try:
         final_state = graph.invoke(initial_state)
-        print("\n--- Workflow Finished ---")
+        logger.info("--- Workflow Finished ---")
         
-        # Report status for each component
-        if not args.skip_small:
-            if final_state.get("small_test_gen_path"):
-                print(f"✓ Small tests generator created: {final_state['small_test_gen_path']}")
+        # Report status based on mode
+        if args.mode in ["basic", "all"]:
+            if final_state.get("basic_test_gen_path"):
+                logger.info("✓ Basic test generator created: %s", final_state['basic_test_gen_path'])
             else:
-                print("✗ Failed to generate small tests")
+                logger.error("✗ Failed to generate basic tests")
                 
-        if not args.skip_stress:
-            if final_state.get("stress_test_gen_path"):
-                print(f"✓ Stress tests generator created: {final_state['stress_test_gen_path']}")
+        if args.mode in ["edge", "all"]:
+            if final_state.get("edge_test_gen_path"):
+                logger.info("✓ Edge case generator created: %s", final_state['edge_test_gen_path'])
             else:
-                print("✗ Failed to generate stress tests")
+                logger.error("✗ Failed to generate edge cases")
                 
-        if not args.skip_validator:
+        if args.mode in ["validator", "all"]:
             if final_state.get("validator_path"):
-                print(f"✓ Test case validator created: {final_state['validator_path']}")
+                logger.info("✓ Test case validator created: %s", final_state['validator_path'])
             else:
-                print("✗ Failed to generate validator")
+                logger.error("✗ Failed to generate validator")
         
         # Check if any requested component failed
-        if ((not args.skip_small and not final_state.get("small_test_gen_path")) or
-            (not args.skip_stress and not final_state.get("stress_test_gen_path")) or
-            (not args.skip_validator and not final_state.get("validator_path"))):
-            print("\nSome components failed to generate.")
+        if ((args.mode in ["basic", "all"] and not final_state.get("basic_test_gen_path")) or
+            (args.mode in ["edge", "all"] and not final_state.get("edge_test_gen_path")) or
+            (args.mode in ["validator", "all"] and not final_state.get("validator_path"))):
+            logger.error("Some components failed to generate.")
             sys.exit(1)
             
     except Exception as e:
-        print("\nError occurred:")
-        print("="*60)
-        traceback.print_exc()
-        print("="*60)
-        print(f"Error message: {str(e)}")
+        logger.error("Error occurred:")
+        logger.error("="*60)
+        logger.error(traceback.format_exc())
+        logger.error("="*60)
+        logger.error("Error message: %s", str(e))
         sys.exit(1)
 
 if __name__ == "__main__":

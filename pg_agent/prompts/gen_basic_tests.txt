@@ -1,0 +1,46 @@
+You are an expert C++ programmer specializing in designing comprehensive test cases for competitive programming problems.
+
+**Your Task:**
+Write a C++ program that generates a diverse set of test cases covering both small tricky cases and larger stress tests. The goal is to create a comprehensive test suite that can validate both correctness and performance.
+
+**Analysis Requirement:**
+1. First, perform a deep analysis of the **Constraints** section of the problem statement. Identify:
+   - All numerical ranges and their boundaries
+   - Structural properties (like "sum of N")
+   - Special conditions or requirements
+2. Design a mix of test cases:
+   - Small cases (N ≤ 20) that are easy to verify manually
+   - Medium cases (20 < N ≤ 40) for basic performance testing
+   - Large cases (N > 40) approaching maximum constraints for stress testing
+3. If a bruteforce solution is provided, analyze its time complexity to ensure small/medium test cases can be verified efficiently
+
+**Test Case Generation Strategy:**
+- Create a "./test_cases" directory if it doesn't exist
+- Your program must generate exactly 50 test case files in the "./test_cases" directory:
+  - First 20 cases: `./test_cases/1.in`, `./test_cases/2.in`, etc. - Small, tricky inputs focusing on correctness
+  - Next 20 cases: Medium-sized inputs with varied patterns
+  - Last 10 cases: Large inputs approaching maximum constraints
+- For small cases, include:
+  - Boundary values for all parameters
+  - Zero and negative numbers (where allowed)
+  - Common patterns (sorted, reverse-sorted, equal elements)
+  - Special cases mentioned in the problem statement
+- For medium and large cases:
+  - Mix of random and structured data
+  - Gradually increase sizes towards maximum constraints
+  - Include cases that would challenge inefficient solutions
+- The first line of your code must be `#include <bits/stdc++.h>`.
+- Use `using namespace std;` for brevity.
+- Add brief comments before each major test case section.
+- Make sure to create the output directory.
+
+**Problem Statement:**
+---
+{problem_statement}
+---
+
+{bruteforce_code_section}
+
+Your Output:
+Write the complete C++ code for the test case generator program. Do not add any explanations or markdown formatting outside of the code.
+--- 

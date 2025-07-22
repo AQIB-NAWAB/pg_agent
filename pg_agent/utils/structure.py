@@ -6,18 +6,28 @@ class ProblemPaths:
     """Represents the standard paths within a problem directory."""
     def __init__(self, problem_dir: Path):
         self.root = problem_dir
+        # Core problem files
         self.problem_statement = self.root / "problem_statement.md"
         self.standard_solution = self.root / "standard.cpp"
-        self.bruteforce_solution = self.root / "solution_bf.cpp"  # Add bruteforce solution path
+        self.bruteforce_solution = self.root / "solution_bf.cpp"  # Main bruteforce solution path
+        self.root_validator = self.root / "validator.cpp"  # Validator in root directory
+        
+        # Generator files in root
+        self.test_generator = self.root / "test_generator.cpp"  # Basic test generator
+        self.edge_generator = self.root / "edge_generator.cpp"  # Edge case generator
+        
+        # Automation directory structure
         self.automation = self.root / "automation"
+        self.automation_bruteforce_dir = self.automation / "bruteForceSol"
         self.automation_settings = self.automation / "automation_settings.json"
-        self.bruteforce_dir = self.automation / "bruteForceSol"
         self.optimal_dir = self.automation / "optimalSol"
         self.test_cases = self.root / "test_cases"
+        self.automation_validator = self.automation / "validator.cpp"  # Validator in automation directory
 
-    def get_bruteforce_path(self, version: int) -> Path:
-        """Gets the path for a specific version of bruteforce solution."""
-        return self.bruteforce_dir / f"bruteforceSolution_v{version}.cpp"
+    @property
+    def validator(self) -> Path:
+        """Gets the validator path, preferring root directory over automation directory."""
+        return self.root_validator if self.root_validator.exists() else self.automation_validator
 
     def get_optimal_path(self, version: int) -> Path:
         """Gets the path for a specific version of optimal solution."""

@@ -1,0 +1,40 @@
+You are an expert C++ programmer specializing in improving edge case test generators for competitive programming problems.
+
+**Your Task:**
+Analyze the existing edge case generator and improve it based on the provided feedback while maintaining its focus on boundary conditions and corner cases.
+
+**Current Implementation:**
+```cpp
+{existing_code}
+```
+
+**User Feedback:**
+{user_feedback}
+
+**Analysis Requirements:**
+1. Review the existing edge cases and their coverage
+2. Identify missing or underrepresented boundary conditions
+3. Look for opportunities to combine multiple edge conditions
+4. Ensure each test case has a clear purpose and targets specific edge scenarios
+5. If a bruteforce solution is provided, use it to identify additional edge cases based on implementation details
+
+**Refinement Strategy:**
+- Keep the successful edge cases from the current implementation
+- Address the specific issues mentioned in the feedback
+- Maintain the focus on boundary conditions and corner cases
+- Ensure all test cases still strictly follow problem constraints
+- Keep or improve the descriptive comments for each test case
+- Continue using the `edge_*.in` naming format
+- The first line must remain `#include <bits/stdc++.h>`
+- Continue using `using namespace std;`
+
+**Problem Statement:**
+---
+{problem_statement}
+---
+
+{bruteforce_code_section}
+
+Your Output:
+Write the complete improved C++ code for the edge case generator. Do not add any explanations or markdown formatting outside of the code.
+--- 

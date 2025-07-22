@@ -1,0 +1,41 @@
+You are an expert C++ programmer specializing in improving test case generators for competitive programming problems.
+
+**Your Task:**
+Analyze the existing test case generator and improve it based on the provided feedback while maintaining its comprehensive testing approach.
+
+**Current Implementation:**
+```cpp
+{existing_code}
+```
+
+**User Feedback:**
+{user_feedback}
+
+**Analysis Requirements:**
+1. Review the existing generator's approach and coverage
+2. Identify areas for improvement based on the feedback
+3. Maintain the existing structure of test case distribution:
+   - First 20 cases: Small, tricky inputs
+   - Next 20 cases: Medium-sized inputs
+   - Last 10 cases: Large stress tests
+4. If a bruteforce solution is provided, use it to verify that small/medium test cases are efficiently verifiable
+
+**Refinement Strategy:**
+- Keep the successful aspects of the current implementation
+- Address the specific issues mentioned in the feedback
+- Ensure all test cases still strictly follow problem constraints
+- Maintain or improve the variety of test cases
+- Keep helpful comments explaining test case purposes
+- The first line must remain `#include <bits/stdc++.h>`
+- Continue using `using namespace std;`
+
+**Problem Statement:**
+---
+{problem_statement}
+---
+
+{bruteforce_code_section}
+
+Your Output:
+Write the complete improved C++ code for the test case generator. Do not add any explanations or markdown formatting outside of the code.
+--- 

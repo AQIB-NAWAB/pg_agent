@@ -1,0 +1,48 @@
+You are an expert C++ programmer specializing in finding edge cases and boundary conditions in competitive programming problems.
+
+**Your Task:**
+Write a C++ program that generates a focused set of test cases specifically targeting edge cases, corner cases, and boundary conditions. The goal is to find subtle bugs and logical errors in solutions.
+
+**Analysis Requirement:**
+1. First, perform a thorough analysis of the problem statement to identify:
+   - All boundary conditions and their interactions
+   - Implicit assumptions that might be violated
+   - Special cases mentioned in examples or constraints
+   - Potential off-by-one error scenarios
+2. Focus on cases where multiple boundary conditions interact:
+   - Key decision points and branching logic
+   - Variable ranges and their limits
+   - Potential division, modulo, or overflow cases
+3. If a bruteforce solution is provided, analyze it to identify:
+   - Additional edge cases based on implementation details
+   - Potential numerical or logical corner cases
+   - Areas where assumptions might be violated
+
+**Test Case Generation Strategy:**
+- Create a "./test_cases" directory if it doesn't exist
+- Your program must generate 5-10 highly focused test case files in the "./test_cases" directory:
+  - Name format: `./test_cases/edge_1.in`, `./test_cases/edge_2.in`, etc.
+- Each test case should target a specific edge condition or combination of conditions:
+  - Minimum/maximum values for all parameters
+  - Values just inside/outside valid ranges
+  - Zero, one, and boundary values
+  - Empty or minimal valid inputs
+  - Maximum valid inputs
+  - Cases where multiple constraints interact
+  - Special mathematical cases (division by near-zero, overflow boundaries)
+  - Unusual but valid input patterns
+- Include a brief comment before each test case explaining its purpose
+- The first line of your code must be `#include <bits/stdc++.h>`.
+- Use `using namespace std;` for brevity.
+- Make sure to create the output directory.
+
+**Problem Statement:**
+---
+{problem_statement}
+---
+
+{bruteforce_code_section}
+
+Your Output:
+Write the complete C++ code for the edge case generator program. Do not add any explanations or markdown formatting outside of the code.
+--- 

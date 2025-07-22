@@ -36,7 +36,7 @@ def load_problem_statement_node(state: BruteForceState) -> BruteForceState:
     
     # Find example test cases using the test runner utility
     test_cases_dir = problem_dir / "test_cases"
-    examples = find_test_cases(test_cases_dir)
+    examples = find_test_cases(test_cases_dir, small_test_cases=True)
     
     print(f"Loaded problem statement and {len(examples)} example test cases.")
     return {
@@ -163,7 +163,7 @@ def test_bruteforce_node(state: BruteForceState) -> BruteForceState:
         print(f"--- Test FAILED on {len(failures)} examples. ---")
         # Save failures to a JSON file
         iteration = state.get("iteration_count", 0)
-        failures_path = paths.bruteforce_dir / f"bruteforceSolution_v{iteration}_failures.json"
+        failures_path = paths.automation_bruteforce_dir / f"bruteforceSolution_v{iteration}_failures.json"
         failures_path.write_text(json.dumps(failures, indent=2), encoding="utf-8")
     else:
         print("--- All examples PASSED. ---")

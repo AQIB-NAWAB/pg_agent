@@ -3,7 +3,7 @@ import re
 import json
 import logging
 from pathlib import Path
-from typing import TypedDict, Optional
+from typing import TypedDict, Optional, Literal
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from ..utils.structure import get_problem_paths
@@ -16,16 +16,14 @@ class TestCaseGeneratorState(TypedDict):
     """
     problem_dir_path: str
     problem_statement: str
-    bruteforce_code: str
-    small_test_gen_path: Optional[str]
-    stress_test_gen_path: Optional[str]
+    bruteforce_code: Optional[str]  # Now optional
+    basic_test_gen_path: Optional[str]
+    edge_test_gen_path: Optional[str]
     validator_path: Optional[str]
     final_verdict: str
     refine_mode: bool  # Whether to refine existing generator
     user_feedback: str  # User feedback for refinement
-    skip_small: bool  # Whether to skip small test generation
-    skip_stress: bool  # Whether to skip stress test generation
-    skip_validator: bool  # Whether to skip validator generation
+    generation_mode: Literal["basic", "edge", "validator", "all"]  # The generation mode to use
 
 def _extract_cpp_code(response_content: str) -> str:
     """Parses the LLM's response to extract only the C++ code."""
@@ -40,35 +38,28 @@ def get_llm_client():
     return ChatOpenAI(model="o3", api_key=api_key)
 
 def load_context_node(state: TestCaseGeneratorState) -> dict:
-    """Loads the problem statement and bruteforce solution if needed.
+    """Loads the problem statement and bruteforce solution if available.
     
-    Only loads bruteforce solution for test generators (small/stress).
+    Only attempts to load bruteforce solution for test generators (basic/edge).
     For validator-only runs, or when not refining, only loads problem statement.
     """
-    print(f"--- Loading context from: {state['problem_dir_path']} ---")
+    logger.info("Loading context from: %s", state['problem_dir_path'])
     paths = get_problem_paths(state['problem_dir_path'])
     
     # Always load problem statement
     if not paths.problem_statement.exists():
         raise FileNotFoundError(f"Problem statement not found at {paths.problem_statement}")
     problem_statement = paths.problem_statement.read_text(encoding="utf-8")
-    print("Loaded problem statement")
+    logger.info("Loaded problem statement")
     
-    # Only load bruteforce solution if we're generating tests
-    bruteforce_code = ""
-    if not (state["skip_small"] and state["skip_stress"]):
-        if not paths.automation_settings.exists():
-            raise FileNotFoundError("automation_settings.json not found. Please run bruteforce generator first.")
-            
-        settings = json.loads(paths.automation_settings.read_text(encoding="utf-8"))
-        bf_version = settings.get("bruteforceSolutionVersion", -1)
-        
-        if bf_version == -1:
-            raise FileNotFoundError("Bruteforce solution not found. Please run bruteforce generator first.")
-            
-        bruteforce_path = paths.get_bruteforce_path(bf_version)
-        bruteforce_code = bruteforce_path.read_text(encoding="utf-8")
-        print("Loaded bruteforce solution")
+    # Try to load bruteforce solution if we're generating tests
+    bruteforce_code = None
+    if state["generation_mode"] in ["basic", "edge", "all"]:
+        if paths.bruteforce_solution.exists():
+            bruteforce_code = paths.bruteforce_solution.read_text(encoding="utf-8")
+            logger.info("Loaded bruteforce solution from %s", paths.bruteforce_solution)
+        else:
+            logger.info("No bruteforce solution found at %s", paths.bruteforce_solution)
     
     return {
         "problem_statement": problem_statement,
@@ -78,7 +69,7 @@ def load_context_node(state: TestCaseGeneratorState) -> dict:
 def _create_generation_node(prompt_file_name: str, output_key: str, version_key: str, needs_bruteforce: bool = True):
     """A factory to create a node that generates test case generator scripts."""
     def generation_node(state: TestCaseGeneratorState) -> dict:
-        print(f"--- Generating: {output_key} ---")
+        logger.info("Generating: %s", output_key)
         
         # Load settings using ProblemPaths
         paths = get_problem_paths(state['problem_dir_path'])
@@ -92,9 +83,9 @@ def _create_generation_node(prompt_file_name: str, output_key: str, version_key:
             existing_path = paths.automation / "testcaseGenScript" / f"{file_prefix}_v{current_version}.cpp"
             if existing_path.exists():
                 existing_code = existing_path.read_text(encoding="utf-8")
-                print(f"Loaded existing version {current_version} for refinement")
+                logger.info("Loaded existing version %d for refinement", current_version)
             else:
-                print(f"Warning: Could not find existing version {current_version} for refinement")
+                logger.warning("Could not find existing version %d for refinement", current_version)
         
         # Determine which prompt to use based on mode
         if state["refine_mode"] and existing_code:
@@ -102,7 +93,7 @@ def _create_generation_node(prompt_file_name: str, output_key: str, version_key:
             prompt_name = prompt_file_name.replace(".txt", "_refine.txt")
             if not (Path(__file__).parent.parent / "prompts" / prompt_name).exists():
                 prompt_name = prompt_file_name  # Fallback to regular prompt
-                print(f"Warning: Refinement prompt {prompt_name} not found, using regular prompt")
+                logger.warning("Refinement prompt %s not found, using regular prompt", prompt_name)
         else:
             prompt_name = prompt_file_name
             
@@ -114,8 +105,13 @@ def _create_generation_node(prompt_file_name: str, output_key: str, version_key:
         # Include existing code and feedback in prompt if refining
         variables = {
             "problem_statement": state["problem_statement"],
-            "bruteforce_code": state["bruteforce_code"] if needs_bruteforce else ""
+            "bruteforce_code_section": ""
         }
+        
+        # Add bruteforce code section if available
+        if state["bruteforce_code"]:
+            variables["bruteforce_code_section"] = "\n**Provided Bruteforce Solution (for analysis):**\n```cpp\n" + state["bruteforce_code"] + "\n```"
+        
         if state["refine_mode"] and existing_code:
             variables["existing_code"] = existing_code
             variables["user_feedback"] = state["user_feedback"]
@@ -123,7 +119,7 @@ def _create_generation_node(prompt_file_name: str, output_key: str, version_key:
         response = chain.invoke(variables)
         code = _extract_cpp_code(response.content)
         
-        # Save the generated code
+        # Save the generated code in automation directory
         new_version = current_version + 1 if current_version >= 0 else 0
         script_dir = paths.automation / "testcaseGenScript"
         script_dir.mkdir(parents=True, exist_ok=True)
@@ -135,18 +131,31 @@ def _create_generation_node(prompt_file_name: str, output_key: str, version_key:
         settings[version_key] = new_version
         paths.update_settings(settings)
         
+        # Also save to problem root directory with appropriate name
+        root_path = {
+            "basicTestcaseGenerator": paths.test_generator,
+            "edgeTestcaseGenerator": paths.edge_generator,
+            "testcaseValidator": paths.validator
+        }.get(file_prefix)
+        
+        if root_path:
+            root_path.write_text(code, encoding="utf-8")
+            logger.info("Copied generator to problem root: %s", root_path)
+        else:
+            logger.warning("Unknown generator type: %s", file_prefix)
+        
         action = "Refined" if state["refine_mode"] and existing_code else "Created"
-        print(f"{action} version {new_version} at: {final_path}")
+        logger.info("%s version %d at: %s", action, new_version, final_path)
         return {output_key: str(final_path)}
 
     return generation_node
 
 # Create the generator nodes
-gen_small_tests_node = _create_generation_node(
-    "gen_small_tests.txt", "small_test_gen_path", "smallTestcaseGeneratorVersion", needs_bruteforce=True
+gen_basic_tests_node = _create_generation_node(
+    "gen_basic_tests.txt", "basic_test_gen_path", "basicTestcaseGeneratorVersion", needs_bruteforce=True
 )
-gen_stress_tests_node = _create_generation_node(
-    "gen_stress_tests.txt", "stress_test_gen_path", "stressTestcaseGeneratorVersion", needs_bruteforce=True
+gen_edge_tests_node = _create_generation_node(
+    "gen_edge_tests.txt", "edge_test_gen_path", "edgeTestcaseGeneratorVersion", needs_bruteforce=True
 )
 gen_validator_node = _create_generation_node(
     "gen_validator.txt", "validator_path", "testcaseValidatorVersion", needs_bruteforce=False

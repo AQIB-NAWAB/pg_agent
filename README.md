@@ -14,6 +14,8 @@ This repository contains a LangGraph pipeline that automatically **creates, solv
 ---
 ## 2 . Setup
 
+### Install required packages
+
 ```bash
 # 1. Clone the repo (skip if you already have it)
 # git clone https://github.com/<your-org>/pg_agent.git
@@ -34,8 +36,120 @@ pip install -r requirements.txt        # or:  pip install -e .[dev]
 # ANTHROPIC_API_KEY="sk-anthropic-..."
 ```
 
+### Install docker
+
+Install docker using any common guide.
+
+Additional dependencies on MacOS:
+```
+brew install docker-credential-helper
+```
+Check your ~/.docker/config.json and replace "credsStore" by "credStore":
+```
+sed -i 's/"credsStore"/"credStore"/g' ~/.docker/config.json
+```
+Add docker cli path:
+```
+echo 'export PATH="$HOME/.docker/bin:$PATH"' >> ~/.zshrc
+```
+
+
 ---
-## 3 . Launching LangGraph Studio
+## 3 . Command-line tools
+
+The package provides several command-line tools for generating and managing competitive programming problems. Each tool accepts an optional `problem_dir` argument. If not specified, the default directory is read from `pg_agent_settings.json`:
+
+```json
+{
+    "problem_directory": "../problems/generated_problem",
+    // ... other settings ...
+}
+```
+
+You can modify this setting to change the default problem directory for all tools.
+
+### 3.1 Problem Statement Generator (`01_problem_statement.py`)
+
+Creates or refines a programming problem statement.
+
+```bash
+python 01_problem_statement.py [output_dir] [options]
+  --topics TOPICS     Create from random/specified topics (comma-separated)
+  --idea IDEA        Create from an initial problem concept
+  --refine FEEDBACK  Refine existing problem with feedback
+  --original PATH    Use another problem as inspiration
+  --verbose         Enable verbose logging
+```
+
+### 3.2 Manual Test Generator (`02_manual_tests.py`)
+
+Generates basic test cases for an existing problem.
+
+```bash
+python 02_manual_tests.py [problem_dir] [options]
+  --verbose         Enable verbose logging
+  --parse          Parse tests from latest raw response
+```
+
+### 3.3 Bruteforce Solution Generator (`03_bruteforce_sol.py`)
+
+Generates or refines a bruteforce solution for the problem.
+
+```bash
+python 03_bruteforce_sol.py [problem_dir] [options]
+  --refine [FEEDBACK]  Refine previous solution with optional feedback
+  --log-level LEVEL   Set logging level (debug/info/warning/error/critical)
+  --quiet            Suppress all output except errors
+```
+
+### 3.4 Optimal Solution Generator (`04_optimal_sol.py`)
+
+Generates or refines an optimized solution for the problem.
+
+```bash
+python 04_optimal_sol.py [problem_dir] [options]
+  --refine [FEEDBACK]  Refine previous solution with feedback
+  --time-limit SEC    Time limit for solution execution (default: 5s)
+  --log-level LEVEL   Set logging level
+  --quiet            Suppress all output except errors
+```
+
+### 3.5 Test Generator (`05_test_generator.py`)
+
+Generates comprehensive test cases and validators.
+
+```bash
+python 05_test_generator.py [problem_dir] [options]
+  --mode MODE        Generation mode: basic/edge/validator/all (default: basic)
+  --refine FEEDBACK  Refine existing generator/validator
+  --log-level LEVEL  Set logging level
+  --quiet           Suppress all output except errors
+```
+
+### 3.6 Test Suite Runner (`06_test_suite.py`)
+
+Validates test cases and generates outputs using bruteforce/optimal solutions.
+
+```bash
+python 06_test_suite.py [problem_dir] [options]
+  --mode MODE        Operation mode: validator/outputs (default: outputs)
+  --time-limit SEC   Time limit for solution execution (default: 2s)
+  --use-optimal     Use optimal solution instead of bruteforce
+  --log-level LEVEL  Set logging level
+  --quiet           Suppress all output except errors
+```
+
+### Typical Workflow
+
+1. Generate problem statement: `python 01_problem_statement.py`
+2. Create manual test cases: `python 02_manual_tests.py`
+3. Generate bruteforce solution: `python 03_bruteforce_sol.py`
+4. Generate optimal solution: `python 04_optimal_sol.py`
+5. Generate comprehensive tests: `python 05_test_generator.py --mode all`
+6. Validate and generate outputs: `python 06_test_suite.py`
+
+---
+## 4 . Launching LangGraph Studio (might be used in future, major flow right now is command line)
 
 ```bash
 # First time only — install your *local* package in editable mode so Studio can
@@ -55,26 +169,6 @@ This will start a local web server on `http://localhost:2024/` (the exact port i
 
 > **Note:** The first run may take a little longer because the LLMs have to spin up.
 
----
-## 4 . Command-line Quick-start (without Studio)
-
-### Install docker
-
-Additionally install `docker-credential-helper`.
-On MacOS:
-```
-brew install docker-credential-helper
-```
-Check your ~/.docker/config.json and replace "credsStore" by "credStore":
-```
-sed -i 's/"credsStore"/"credStore"/g' ~/.docker/config.json
-```
-Add docker cli path:
-```
-echo 'export PATH="$HOME/.docker/bin:$PATH"' >> ~/.zshrc
-```
-
-
 If you just want to run the pipeline headless:
 
 ```bash
@@ -86,22 +180,7 @@ PY
 ```
 
 ---
-## 5 . Folder Structure (high-level)
-
-```
-pg_agent/
-├─ pg_agent/                 # Installable package
-│  ├─ pipeline/              # LangGraph nodes & graph
-│  ├─ prompts/
-│  └─ utils/
-├─ tests/
-├─ langgraph.json
-├─ requirements.txt / pyproject.toml
-└─ README.md
-```
-
----
-## 6 . Troubleshooting
+## 5 . Troubleshooting
 
 | Symptom | Fix |
 |---------|------|
@@ -110,11 +189,11 @@ pg_agent/
 | "401 / 403" from provider | Double-check `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc. |
 
 ---
-## 7 . Contributing
+## 6 . Contributing
 
 PRs are welcome! Please open an issue first to discuss changes.
 
 ---
-## 8 . License
+## 7 . License
 
 MIT © 2024 

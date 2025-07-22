@@ -82,6 +82,8 @@ python 01_problem_statement.py [output_dir] [options]
   --quiet           Suppress all output except errors
 ```
 
+By default, if no topics are specified, the generator will automatically select a combination of 1-2 random topics from a predefined list (e.g., "Dynamic Programming", "Trees", etc.).
+
 ### 3.2 Manual Test Generator (`02_manual_tests.py`)
 
 Generates basic test cases for an existing problem.

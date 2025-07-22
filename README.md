@@ -78,7 +78,8 @@ python 01_problem_statement.py [output_dir] [options]
   --idea IDEA        Create from an initial problem concept
   --refine FEEDBACK  Refine existing problem with feedback
   --original PATH    Use another problem as inspiration
-  --verbose         Enable verbose logging
+  --log-level LEVEL  Set logging level (debug/info/warning/error/critical)
+  --quiet           Suppress all output except errors
 ```
 
 ### 3.2 Manual Test Generator (`02_manual_tests.py`)
@@ -87,7 +88,8 @@ Generates basic test cases for an existing problem.
 
 ```bash
 python 02_manual_tests.py [problem_dir] [options]
-  --verbose         Enable verbose logging
+  --log-level LEVEL  Set logging level (debug/info/warning/error/critical)
+  --quiet           Suppress all output except errors
   --parse          Parse tests from latest raw response
 ```
 

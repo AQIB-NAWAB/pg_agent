@@ -11,7 +11,7 @@ from pg_agent.nodes.manual_tests_nodes import (
     SimpleTestGenerationState,
     generate_simple_test_cases,
 )
-from pg_agent.utils.logging import setup_logging
+from pg_agent.utils.logging import setup_logging, get_log_level
 from pg_agent.utils.structure import get_default_problem_dir, get_problem_paths
 
 def build_test_cases_creator_graph() -> StateGraph:
@@ -37,9 +37,12 @@ def main():
     parser.add_argument("problem_dir", nargs="?", default=default_dir,
                        help=f"Path to the problem directory (default: {default_dir})")
     
-    # Add verbose flag
-    parser.add_argument("--verbose", action="store_true",
-                       help="Enable verbose logging output")
+    # Add logging control arguments
+    parser.add_argument("--log-level", type=str, default="info",
+                       choices=['debug', 'info', 'warning', 'error', 'critical'],
+                       help="Set the logging level (default: info)")
+    parser.add_argument("--quiet", action="store_true",
+                       help="Suppress all output except errors (equivalent to --log-level error)")
     
     # Add parse flag
     parser.add_argument("--parse", action="store_true",
@@ -47,8 +50,15 @@ def main():
     
     args = parser.parse_args()
 
-    # Setup logging based on verbosity
-    setup_logging(args.verbose)
+    # Handle quiet mode
+    if args.quiet:
+        log_level = logging.ERROR
+    else:
+        log_level = get_log_level(args.log_level)
+
+    # Setup logging with the specified level
+    setup_logging(log_level)
+    logger = logging.getLogger(__name__)
 
     if not args.problem_dir:
         parser.error("No problem directory specified and could not read default from settings")
@@ -56,7 +66,7 @@ def main():
     # Get problem paths and verify problem statement exists
     paths = get_problem_paths(args.problem_dir)
     if not args.parse and not paths.problem_statement.exists():
-        print(f"Error: Problem statement not found at {paths.problem_statement}")
+        logger.error("Problem statement not found at %s", paths.problem_statement)
         sys.exit(1)
 
     # Read the existing problem statement if not in parse-only mode
@@ -76,14 +86,15 @@ def main():
     graph = build_test_cases_creator_graph()
     try:
         final_state = graph.invoke(initial_state)
-        print("\n--- Workflow Finished ---")
+        logger.info("--- Workflow Finished ---")
         if final_state.get("test_cases"):
-            print(f"Generated {len(final_state['test_cases'])} test cases successfully in: {paths.root}/test_cases/")
+            logger.info("Generated %d test cases successfully in: %s/test_cases/", 
+                     len(final_state['test_cases']), paths.root)
         else:
-            print("Failed to generate test cases.")
+            logger.error("Failed to generate test cases.")
             sys.exit(1)
     except Exception as e:
-        print(f"\nError: {str(e)}")
+        logger.error("Error: %s", str(e))
         sys.exit(1)
 
 if __name__ == "__main__":

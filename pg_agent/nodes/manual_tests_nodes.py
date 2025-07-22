@@ -98,6 +98,28 @@ def _save_manual_tests_response(problem_dir: Path, response_content: str) -> Tup
     
     return new_version, final_path
 
+def _get_next_test_number(test_cases_dir: Path) -> int:
+    """Gets the next available test number by checking existing test files.
+    
+    Args:
+        test_cases_dir: Path to the test cases directory
+        
+    Returns:
+        The next available test number
+    """
+    # Find all test_N.in files
+    test_files = test_cases_dir.glob("test_*.in")
+    test_numbers = []
+    
+    # Extract numbers from filenames
+    for test_file in test_files:
+        match = re.match(r"test_(\d+)\.in", test_file.name)
+        if match:
+            test_numbers.append(int(match.group(1)))
+    
+    # Return next number after the highest existing number, or 1 if no tests exist
+    return max(test_numbers, default=0) + 1
+
 def generate_simple_test_cases(state: SimpleTestGenerationState) -> SimpleTestGenerationState:
     """Generate additional test cases beyond examples."""
     paths = get_problem_paths(state['output_dir'])
@@ -134,22 +156,19 @@ def generate_simple_test_cases(state: SimpleTestGenerationState) -> SimpleTestGe
     paths.test_cases.mkdir(exist_ok=True)
     logger.info("Saving test cases to: %s", paths.test_cases)
     
-    # Clean up existing test files
-    for f in paths.test_cases.glob("test_*.in"):
-        logger.info("Removing old test file: %s", f)
-        f.unlink()
-    for f in paths.test_cases.glob("test_*.out"):
-        logger.info("Removing old test file: %s", f)
-        f.unlink()
+    # Get the next available test number
+    next_test_number = _get_next_test_number(paths.test_cases)
+    logger.info("Starting test case numbering from: %d", next_test_number)
     
-    for i, (input_data, output_data) in enumerate(test_cases, 1):
-        input_path = paths.test_cases / f"test_{i}.in"
-        output_path = paths.test_cases / f"test_{i}.out"
+    for i, (input_data, output_data) in enumerate(test_cases):
+        test_number = next_test_number + i
+        input_path = paths.test_cases / f"test_{test_number}.in"
+        output_path = paths.test_cases / f"test_{test_number}.out"
         input_path.write_text(input_data, encoding="utf-8")
         output_path.write_text(output_data, encoding="utf-8")
-        logger.info("Saved test case %d to %s and %s", i, input_path, output_path)
-        logger.info("Input: %s", input_data[:100] + "..." if len(input_data) > 100 else input_data)
-        logger.info("Output: %s", output_data[:100] + "..." if len(output_data) > 100 else output_data)
+        logger.info("Saved test case %d to %s and %s", test_number, input_path, output_path)
+        logger.debug("Input: %s", input_data[:100] + "..." if len(input_data) > 100 else input_data)
+        logger.debug("Output: %s", output_data[:100] + "..." if len(output_data) > 100 else output_data)
     
-    print(f"Generated and saved {len(test_cases)} test cases.")
+    print(f"Generated and saved {len(test_cases)} test cases starting from number {next_test_number}.")
     return {"test_cases": test_cases} 

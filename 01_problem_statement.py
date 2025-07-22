@@ -17,7 +17,7 @@ from pg_agent.nodes.problem_definition_nodes import (
     extract_examples,
     ProblemDefinitionState,
 )
-from pg_agent.utils.logging import setup_logging
+from pg_agent.utils.logging import setup_logging, get_log_level
 from pg_agent.utils.structure import get_default_problem_dir
 from pg_agent.nodes.topic_selector import select_random_topics
 
@@ -67,13 +67,24 @@ def main():
     # Add original problem argument
     parser.add_argument("--original", help="Path to an original problem to use as inspiration")
     
-    # Add verbose flag
-    parser.add_argument("--verbose", action="store_true", help="Enable verbose logging output")
+    # Add logging control arguments
+    parser.add_argument("--log-level", type=str, default="info",
+                       choices=['debug', 'info', 'warning', 'error', 'critical'],
+                       help="Set the logging level (default: info)")
+    parser.add_argument("--quiet", action="store_true",
+                       help="Suppress all output except errors (equivalent to --log-level error)")
     
     args = parser.parse_args()
 
-    # Setup logging based on verbosity
-    setup_logging(args.verbose)
+    # Handle quiet mode
+    if args.quiet:
+        log_level = logging.ERROR
+    else:
+        log_level = get_log_level(args.log_level)
+
+    # Setup logging with the specified level
+    setup_logging(log_level)
+    logger = logging.getLogger(__name__)
 
     if not args.output_dir:
         parser.error("No output directory specified and could not read default from settings")
@@ -82,7 +93,7 @@ def main():
     if not any([args.topics, args.idea, args.refine]):
         topics_list = select_random_topics()
         args.topics = ", ".join(topics_list)
-        print(f"No topics specified. Using randomly selected topics: '{args.topics}'")
+        logger.info("No topics specified. Using randomly selected topics: '%s'", args.topics)
 
     # Load original problem if specified
     previous_problem = None
@@ -109,10 +120,10 @@ def main():
     
     try:
         final_state = graph.invoke(initial_state)
-        print("\n--- Workflow Finished ---")
-        print(f"Problem created successfully in: {final_state['output_dir']}")
+        logger.info("--- Workflow Finished ---")
+        logger.info("Problem created successfully in: %s", final_state['output_dir'])
     except Exception as e:
-        print(f"\nError: {str(e)}")
+        logger.error("Error: %s", str(e))
         sys.exit(1)
 
 if __name__ == "__main__":

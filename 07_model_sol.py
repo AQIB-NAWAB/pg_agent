@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 
 from pg_agent.utils.env import load_env
-from pg_agent.utils.models import ChatBytedance, ChatAlibaba
+from pg_agent.utils.models import ChatBytedance, ChatAlibaba, ChatHunyuan
 from pg_agent.utils.logging import setup_logging, get_log_level
 from pg_agent.utils.structure import get_default_problem_dir, get_problem_paths
 from pg_agent.utils.parsing import extract_cpp_code
@@ -70,18 +70,20 @@ async def generate_code_async(llm, problem_text, num, problem_paths, model_name,
 
 
 def main():
-    env_keys = load_env()
-
     default_dir = get_default_problem_dir()
-    parser = argparse.ArgumentParser(description="Generate C++ solutions using Qwen or Dubao")
+    parser = argparse.ArgumentParser(description="Generate C++ solutions using Qwen, Doubao or Tencent models")
     parser.add_argument("problem_dir", nargs="?", default=default_dir,
                         help=f"Path to problem directory (default: {default_dir})")
     parser.add_argument("--num", type=int, default=1,
                         help="Number of completions to generate")
+    parser.add_argument("--provider", choices=["dashscope", "fireworks"], default="dashscope",
+                    help="LLM provider to use for Qwen models (default: dashscope)")
     parser.add_argument("--model", choices=[
         "qwen3-coder-480b-a35b-instruct",
         "qwen3-235b-a22b-thinking-2507",
-        "doubao-seed-1-6-thinking-250715"
+        "doubao-seed-1-6-thinking-250715",
+        "hunyuan-t1-20250711",
+        "hunyuan-turbos-20250604"
     ], default="doubao-seed-1-6-thinking-250715",
         help="Choose model to use")
     parser.add_argument("--enable-thinking", action="store_true",
@@ -92,7 +94,7 @@ def main():
     parser.add_argument("--quiet", action="store_true",
                         help="Suppress output except errors")
     args = parser.parse_args()
-
+    env_keys = load_env(provider=args.provider)
     log_level = logging.ERROR if args.quiet else get_log_level(args.log_level)
     setup_logging(log_level)
     logger = logging.getLogger(__name__)
@@ -117,17 +119,29 @@ def main():
 
         use_thinking = args.enable_thinking or "thinking" in args.model.lower()
 
-        llm = ChatAlibaba(
-            model=model_name,
-            api_key=api_key,
-            temperature=0.5,
-            enable_thinking=use_thinking
-        ) if args.model.startswith("qwen") else ChatBytedance(
-            model=model_name,
-            api_key=api_key,
-            temperature=0.5
-        )
-
+        # Model routing
+        if args.model.startswith("qwen"):
+            llm = ChatAlibaba(
+                model=model_name,
+                api_key=api_key,
+                temperature=0.5,
+                enable_thinking=use_thinking
+            )
+        elif args.model.startswith("doubao"):
+            llm = ChatBytedance(
+                model=model_name,
+                api_key=api_key,
+                temperature=0.5
+            )
+        elif args.model.startswith("hunyuan"):
+            llm = ChatHunyuan(
+                model=model_name,
+                api_key=api_key,
+                temperature=0.5
+            )
+        else:
+            raise ValueError(f"Unsupported model: {args.model}")
+        
         with open(problem_paths.problem_statement, "r", encoding="utf-8") as f:
             problem_text = f.read()
 

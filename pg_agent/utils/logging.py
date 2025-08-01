@@ -27,3 +27,4 @@ def setup_logging(log_level: int = logging.INFO) -> None:
     # Optionally silence some chatty libraries
     logging.getLogger('httpx').setLevel(logging.WARNING)
     logging.getLogger('openai').setLevel(logging.WARNING) 
+    return logging.getLogger(__name__)  # return logger

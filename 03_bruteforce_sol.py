@@ -46,16 +46,17 @@ def main():
     default_dir = get_default_problem_dir()
     parser = argparse.ArgumentParser(description="Generate a bruteforce solution for a programming problem")
     parser.add_argument("problem_dir", nargs="?", default=default_dir,
-                       help=f"Path to the problem directory (default: {default_dir})")
-    
+                        help=f"Path to the problem directory (default: {default_dir})")
     parser.add_argument("--refine", type=str, nargs='?', const='',
-                       help="Refine previous solution. Optionally provide feedback for improvement.")
+                        help="Refine previous solution. Optionally provide feedback for improvement.")
+    parser.add_argument("--model", type=str, default="o3",
+                        help="LLM model to use (e.g., o3, gpt-4, claude-3-sonnet)")
     parser.add_argument("--log-level", type=str, default="info",
-                       choices=['debug', 'info', 'warning', 'error', 'critical'],
-                       help="Set the logging level (default: info)")
+                        choices=['debug', 'info', 'warning', 'error', 'critical'],
+                        help="Set the logging level (default: info)")
     parser.add_argument("--quiet", action="store_true",
-                       help="Suppress all output except errors (equivalent to --log-level error)")
-    
+                        help="Suppress all output except errors (equivalent to --log-level error)")
+
     args = parser.parse_args()
 
     # Handle quiet mode
@@ -86,12 +87,13 @@ def main():
         "problem_dir_path": str(problem_dir),
         "problem_statement": "",
         "example_test_cases": [],
-        "bruteforce_code": None,  # Will be set by generate_or_refine node
+        "bruteforce_code": None,
         "test_failures": [],
         "iteration_count": next_version,
         "human_feedback": args.refine if args.refine is not None else None,
         "final_verdict": None,
-        "final_bruteforce_path": None
+        "final_bruteforce_path": None,
+        "llm_model": args.model  # <-- Model support added here
     }
 
     # Run the workflow
@@ -99,27 +101,27 @@ def main():
     try:
         final_state = graph.invoke(initial_state)
         logger.info("--- Workflow Finished ---")
-        
+
         # Check if we have a successful solution
         if final_state.get("final_verdict") == "SUCCESS":
-            logger.info("Bruteforce solution generated successfully in: %s", 
-                       final_state.get('final_bruteforce_path'))
+            logger.info("Bruteforce solution generated successfully in: %s",
+                        final_state.get('final_bruteforce_path'))
         elif final_state.get("test_failures"):
-            logger.warning("Solution failed some tests. Use --refine to improve it.")
+            logger.warning("Solution failed some tests. Use --refine to improve it or change the model by using --model.")
             if not args.refine:
-                logger.info("Example: %s --refine \"Fix the edge case with negative numbers\"", sys.argv[0])
+                logger.info("Example: %s --refine or --model \"Fix the edge case with negative numbers\"", sys.argv[0])
             sys.exit(1)
         else:
             logger.error("Failed to generate a working bruteforce solution - unknown error.")
             sys.exit(1)
-            
+
     except Exception as e:
         logger.error("Error occurred:")
-        logger.error("="*60)
+        logger.error("=" * 60)
         logger.error(traceback.format_exc())
-        logger.error("="*60)
+        logger.error("=" * 60)
         logger.error("Error message: %s", str(e))
         sys.exit(1)
 
 if __name__ == "__main__":
-    main() 
+    main()

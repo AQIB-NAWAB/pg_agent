@@ -21,6 +21,7 @@ class ProblemPaths:
         self.automation_bruteforce_dir = self.automation / "bruteForceSol"
         self.automation_settings = self.automation / "automation_settings.json"
         self.optimal_dir = self.automation / "optimalSol"
+        self.qwen = self.root / "qwen"
         self.test_cases = self.root / "test_cases"
         self.automation_validator = self.automation / "validator.cpp"  # Validator in automation directory
 

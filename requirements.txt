@@ -25,3 +25,10 @@ langgraph-cli[inmem]>=0.3.3
 docker>=6.0.1  # For Docker interactions
 
 questionary>=2.1.0  # For interactive CLI prompts
+
+# Frameworks and utilities Required for Fireworks
+langchain>=0.1.27  # Core LangChain library
+langchain-fireworks>=0.0.1
+
+# Frameworks and utilities Required for volcengine-python-sdk
+volcengine>=1.0.0  # Official VolcEngine SDK for Python (supports VOD, ECS, VPC, etc.)

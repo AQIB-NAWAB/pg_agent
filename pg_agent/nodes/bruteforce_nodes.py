@@ -5,11 +5,13 @@ import logging
 from pathlib import Path
 from typing import TypedDict, List, Dict, Optional, Tuple
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
+from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
 
 from ..utils.test_runner import find_test_cases, run_tests
 from ..utils.structure import get_problem_paths
+from ..utils.models import get_llm
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -26,18 +28,19 @@ class BruteForceState(TypedDict):
     human_feedback: Optional[str]
     final_verdict: Optional[str]  # Final status of the solution generation
     final_bruteforce_path: Optional[str]  # Path to the final saved solution
+    llm_model: Optional[str]  
 
 def load_problem_statement_node(state: BruteForceState) -> BruteForceState:
     """Loads the problem statement and example test cases."""
     print(f"--- Loading problem from: {state['problem_dir_path']} ---")
     problem_dir = Path(state['problem_dir_path'])
-    
+
     problem_statement = (problem_dir / "problem_statement.md").read_text(encoding="utf-8")
     
     # Find example test cases using the test runner utility
     test_cases_dir = problem_dir / "test_cases"
     examples = find_test_cases(test_cases_dir, small_test_cases=True)
-    
+
     print(f"Loaded problem statement and {len(examples)} example test cases.")
     return {
         **state,
@@ -69,13 +72,11 @@ def generate_or_refine_bruteforce_node(state: BruteForceState) -> BruteForceStat
     """Generates or refines bruteforce solution based on state."""
     is_refinement = state.get("human_feedback") is not None
     print(f"--- {'Refining' if is_refinement else 'Generating'} bruteforce solution ---")
-    
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY not found in environment.")
-    llm = ChatOpenAI(model="o3", api_key=api_key)
-    
+
     # Load appropriate prompt template
+    model = state.get("llm_model", "o3")
+    llm = get_llm(model)
+
     prompt_name = "refine_bruteforce.txt" if is_refinement else "gen_bruteforce.txt"
     prompt_path = Path(__file__).parent.parent / "prompts" / prompt_name
     prompt_template = prompt_path.read_text(encoding="utf-8")
@@ -90,8 +91,8 @@ def generate_or_refine_bruteforce_node(state: BruteForceState) -> BruteForceStat
         if previous_code is None:
             raise ValueError("No previous solution found for refinement")
         print("Loaded previous solution for refinement")
-            
-        # Load previous failures if available
+
+        # Load previous test failures if available
         prev_version = state.get("iteration_count", 0) - 1
         failures_path = problem_dir / "automation" / "bruteForceSol" / f"bruteforceSolution_v{prev_version}_failures.json"
         
@@ -121,7 +122,7 @@ def generate_or_refine_bruteforce_node(state: BruteForceState) -> BruteForceStat
     # Create and invoke the chain
     chain = prompt | llm
     response = chain.invoke(variables)
-    
+
     # Extract code from response
     code_match = re.search(r'```(?:cpp)?\s*([\s\S]+?)\s*```', response.content)
     code = code_match.group(1).strip() if code_match else response.content.strip()

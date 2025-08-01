@@ -93,7 +93,16 @@ def run_test_suite(solution_path: str, test_cases_dir: Path, time_limit: float):
     """
     work_dir = test_cases_dir
     
-    shutil.copy(solution_path, work_dir / "solution.cpp")
+    # Define source and destination paths using pathlib
+    src_path = Path(solution_path)
+    dest_path = work_dir / "solution.cpp"
+
+    # Only copy if the source and destination are not the same file.
+    # We use .resolve() to get the absolute, canonical path, which correctly
+    # handles different path syntaxes ('/' vs '\') on Windows.
+    if src_path.resolve() != dest_path.resolve():
+        shutil.copy(str(src_path), dest_path)
+    
     runner_sh_content = (Path(__file__).parent / "runner.sh").read_text().replace('\r\n', '\n')
     (work_dir / "runner.sh").write_text(runner_sh_content, newline='\n')
     os.chmod(work_dir / "runner.sh", 0o755)
@@ -105,7 +114,7 @@ def run_test_suite(solution_path: str, test_cases_dir: Path, time_limit: float):
         raise Exception(f"Test suite execution failed:\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}")
     
     print(stdout) # Print the output for debugging
-
+    
 def run_solution_on_test_case(solution_path: str, input_file: Path, time_limit: float) -> (bool, str):
     """Runs a solution against an input file with a timeout. Returns (timed_out, output)."""
     with tempfile.TemporaryDirectory() as temp_dir:

@@ -2,8 +2,9 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 import re
 import logging
+import tempfile
 
-from ..pipeline.sandbox.sandbox_utils import run_single_test
+from ..pipeline.sandbox.sandbox_utils import run_test_suite, run_single_test
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +118,8 @@ def find_test_cases(test_cases_dir: Path, small_test_cases: bool = False) -> Lis
     
     logger.info("Found %d example(s), %d numbered test(s), and %d edge test(s)", 
                 len(example_pairs), len(numbered_pairs), len(edge_pairs))
+    
+    logger.info("Found %d example(s)", len(test_cases))
     return test_cases
 
 def find_orphaned_test_inputs(test_cases_dir: Path) -> List[str]:
@@ -200,81 +203,71 @@ def find_orphaned_test_inputs(test_cases_dir: Path) -> List[str]:
                 len(numbered_orphans), len(edge_orphans))
     return orphaned_inputs
 
-def run_tests(solution_code: str, test_cases: List[Dict[str, str]]) -> List[Dict[str, str]]:
-    """Run tests against the provided solution code.
-    
-    Args:
-        solution_code: The code to test
-        test_cases: List of test cases to run against
-        
-    Returns:
-        List of test failures. Empty list means all tests passed.
-        Failures can include compilation errors or runtime test failures.
-    """
-    logger.info("Starting test execution")
+def run_tests(solution_code: str, test_cases: List[Dict[str, str]], time_limit: float = 5.0) -> List[Dict[str, str]]:
+    """Run tests against the provided solution code efficiently."""
+    logger.info("Starting efficient test execution for %d test cases", len(test_cases))
     failures = []
     
     if not test_cases:
         logger.warning("No test cases provided")
         return failures
-    
-    # Try first test case to check for compilation errors
-    logger.info("Checking compilation...")
-    passed, output, error = run_single_test(
-        solution_code=solution_code,
-        input_data=test_cases[0]["input"]
-    )
-    
-    # If compilation failed, return it as a special failure
-    if not passed and "error:" in error:
-        logger.error("Compilation failed")
-        return [{
-            "test_number": 0,
-            "test_name": "compilation",
-            "input": "",
-            "expected_output": "Successful compilation",
-            "actual_output": output,
-            "error": error,
-            "is_compilation_error": True
-        }]
-    
-    logger.info("Executing %d test cases...", len(test_cases))
-    for i, test_case in enumerate(test_cases, 1):
-        logger.info("Test #%d: %s", i, test_case['name'])
-        logger.debug("Input: %s", test_case['input'].strip())
-        logger.debug("Expected: %s", test_case['output'])
         
-        passed, actual_output, error = run_single_test(
-            solution_code=solution_code,
-            input_data=test_case["input"]
-        )
+    with tempfile.TemporaryDirectory() as temp_dir:
+        work_dir = Path(temp_dir)
         
-        actual_output_stripped = actual_output.strip()
-        logger.debug("Actual: %s", actual_output_stripped)
+        # 1. Prepare the directory for the test suite
+        solution_path = work_dir / "solution.cpp"
+        solution_path.write_text(solution_code, encoding="utf-8")
         
-        if not passed or actual_output_stripped != test_case["output"]:
-            logger.error("Test #%d FAILED", i)
-            failures.append({
-                "test_number": i,
-                "test_name": test_case["name"],
-                "input": test_case["input"],
-                "expected_output": test_case["output"],
-                "actual_output": actual_output_stripped,
-                "error": error if error else None,
-                "is_compilation_error": False
-            })
-        else:
-            logger.info("Test #%d PASSED", i)
+        for test_case in test_cases:
+            (work_dir / test_case["name"]).write_text(test_case["input"], encoding="utf-8")
+
+        # 2. Run the entire suite in a single container
+        try:
+            run_test_suite(
+                solution_path=str(solution_path),
+                test_cases_dir=work_dir,
+                time_limit=time_limit
+            )
+        except Exception as e:
+            logger.error("Test suite execution failed with an exception: %s", e)
+            return [{"test_name": "suite_execution", "reason": str(e)}]
+
+        # 3. Check the results
+        for i, test_case in enumerate(test_cases, 1):
+            out_file = work_dir / test_case["name"].replace(".in", ".out")
             
-    # Log summary
+            if not out_file.exists():
+                failures.append({
+                    "test_number": i, "test_name": test_case["name"],
+                    "reason": "Output file not created (likely runtime error)"
+                })
+                continue
+
+            actual_output = out_file.read_text(encoding="utf-8").strip()
+            expected_output = test_case["output"].strip()
+
+            if actual_output == "TIMEOUT":
+                logger.error("Test #%d FAILED (TIMEOUT)", i)
+                failures.append({
+                    "test_number": i, "test_name": test_case["name"],
+                    "reason": "Time Limit Exceeded"
+                })
+            elif actual_output != expected_output:
+                logger.error("Test #%d FAILED (Wrong Answer)", i)
+                failures.append({
+                    "test_number": i, "test_name": test_case["name"],
+                    "input": test_case["input"],
+                    "expected_output": expected_output,
+                    "actual_output": actual_output,
+                })
+            else:
+                logger.info("Test #%d PASSED", i)
+
     total = len(test_cases)
-    passed = total - len(failures)
-    logger.info("Test Summary: %d/%d tests passed", passed, total)
+    passed_count = total - len(failures)
+    logger.info("Test Summary: %d/%d tests passed", passed_count, total)
     if failures:
-        if any(f.get("is_compilation_error", False) for f in failures):
-            logger.error("Compilation failed")
-        else:
-            logger.error("Failed tests: %s", 
-                        ', '.join(f['test_name'] for f in failures))
+        logger.error("Failed tests: %s", ', '.join(f['test_name'] for f in failures))
             
-    return failures 
+    return failures

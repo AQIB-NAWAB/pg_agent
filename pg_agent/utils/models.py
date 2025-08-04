@@ -38,7 +38,7 @@ def get_llm(model_name: str):
 # ========= Custom Async LLM Wrappers =========
 
 class ChatBytedance:
-    def __init__(self, model: str, api_key: str, temperature: float = 1.0, retries: int = 3, delay: int = 3):
+    def __init__(self, model: str, api_key: str, temperature: float = 0.5, retries: int = 3, delay: int = 3):
         self.model = model
         self.client = Ark(api_key=api_key)
         self.temperature = temperature

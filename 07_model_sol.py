@@ -12,40 +12,58 @@ from langchain_core.messages import HumanMessage
 from pg_agent.utils.env import load_env
 from pg_agent.utils.models import ChatBytedance, ChatAlibaba
 from pg_agent.utils.logging import setup_logging, get_log_level
-from pg_agent.utils.structure import get_default_problem_dir
+from pg_agent.utils.structure import get_default_problem_dir, get_problem_paths
 from pg_agent.utils.parsing import extract_cpp_code
 
 
-async def generate_one(llm, prompt, index, output_dir, logger):
+async def generate_one(llm, prompt, index, problem_paths, model_name, logger):
     messages = [HumanMessage(content=prompt)]
     try:
         response = await llm.ainvoke(messages)
         cpp_code = extract_cpp_code(response.content)
-        file_path = output_dir / f"run_{index:02d}.cpp"
-        file_path.write_text(cpp_code, encoding="utf-8")
-        logger.info("✅ Saved: %s", file_path)
+        
+        # Get paths for code, prompt and raw response
+        code_path, prompt_path, response_path = problem_paths.get_run_paths(model_name, index)
+        
+        # Save the code to runs/
+        code_path.write_text(cpp_code, encoding="utf-8")
+        logger.info("✅ Saved code to: %s", code_path)
+        
+        # Save the full response to automation/runs/
+        response_path.write_text(response.content, encoding="utf-8")
+        logger.info("✅ Saved full response to: %s", response_path)
+        
     except Exception as e:
         logger.error(f"❌ Error generating solution {index}: {e}")
 
 
-async def generate_code_async(llm, problem_text, num, output_dir, logger):
+async def generate_code_async(llm, problem_text, num, problem_paths, model_name, logger):
     # Find the highest existing solution index
-    existing_files = list(output_dir.glob("run_*.cpp"))
+    model_dir = problem_paths.runs / model_name
     max_index = 0
-    for file in existing_files:
-        # Try both formats: run_01.cpp and run_1.cpp
-        match = re.search(r"run_(\d+)\.cpp", file.name)
-        if match:
-            index = int(match.group(1))
-            max_index = max(max_index, index)
+    if model_dir.exists():
+        for file in model_dir.glob("run_*.cpp"):
+            match = re.search(r"run_(\d+)\.cpp", file.name)
+            if match:
+                index = int(match.group(1))
+                max_index = max(max_index, index)
 
     prompt = (
-        "Generate the complete and correct C++ code only for the following problem. "
-        "Do not include any explanation, comments, thoughts or reasoning. Just the code:\n\n"
-        f"{problem_text}"
+        "You are an expert competitive programmer. Please solve the following problem:\n\n"
+        f"{problem_text}\n\n"
+        "First analyze the problem, then provide your solution in C++. "
+        "Consider edge cases, time complexity, and space complexity. "
+        "Make sure your solution handles all constraints mentioned in the problem. "
+        "Your final solution should be a complete, compilable C++ program."
     )
+    
+    # Get paths for the first run to get prompt path
+    _, prompt_path, _ = problem_paths.get_run_paths(model_name, 0)
+    prompt_path.write_text(prompt, encoding="utf-8")
+    logger.info("✅ Saved prompt to: %s", prompt_path)
+    
     tasks = [
-        generate_one(llm, prompt, i, output_dir, logger)
+        generate_one(llm, prompt, i, problem_paths, model_name, logger)
         for i in range(max_index + 1, max_index + num + 1)
     ]
     await asyncio.gather(*tasks)
@@ -80,7 +98,6 @@ def main():
     logger = logging.getLogger(__name__)
 
     problem_dir = Path(args.problem_dir)
-    problem_statement_path = problem_dir / "problem_statement.md"
 
     try:
         if args.model not in env_keys:
@@ -93,33 +110,31 @@ def main():
         if not api_key:
             raise ValueError(f"API key not found for model: {args.model}")
 
-        if not problem_statement_path.exists():
-            logger.error("❌ Problem statement not found: %s", problem_statement_path)
+        problem_paths = get_problem_paths(str(problem_dir))
+        if not problem_paths.problem_statement.exists():
+            logger.error("❌ Problem statement not found: %s", problem_paths.problem_statement)
             sys.exit(1)
-
-        output_dir = problem_dir / "runs" / args.model
-        output_dir.mkdir(parents=True, exist_ok=True)
 
         use_thinking = args.enable_thinking or "thinking" in args.model.lower()
 
         llm = ChatAlibaba(
             model=model_name,
             api_key=api_key,
-            temperature=1.3,
+            temperature=0.5,
             enable_thinking=use_thinking
         ) if args.model.startswith("qwen") else ChatBytedance(
             model=model_name,
             api_key=api_key,
-            temperature=1.3
+            temperature=0.5
         )
 
-        with open(problem_statement_path, "r", encoding="utf-8") as f:
+        with open(problem_paths.problem_statement, "r", encoding="utf-8") as f:
             problem_text = f.read()
 
         logger.info("🚀 Generating %d solution(s) using model: %s%s",
                     args.num, args.model,
                     " (with thinking)" if use_thinking else "")
-        asyncio.run(generate_code_async(llm, problem_text, args.num, output_dir, logger))
+        asyncio.run(generate_code_async(llm, problem_text, args.num, problem_paths, args.model, logger))
 
     except Exception as e:
         logger.error("❌ Execution error:")

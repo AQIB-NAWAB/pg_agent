@@ -24,6 +24,33 @@ class ProblemPaths:
         self.qwen = self.root / "qwen"
         self.test_cases = self.root / "test_cases"
         self.automation_validator = self.automation / "validator.cpp"  # Validator in automation directory
+        self.runs = self.root / "runs"  # Directory for model runs (clean code)
+        self.automation_runs = self.automation / "runs"  # Directory for raw model outputs
+
+    def get_run_paths(self, model_name: str, index: int) -> tuple[Path, Path, Path]:
+        """Gets the paths for code and response files for a specific run.
+        
+        Args:
+            model_name: Name of the model used
+            index: Run index
+            
+        Returns:
+            Tuple of (code_path, prompt_path, response_path) where:
+            - code_path: Path to the clean C++ code file in runs/
+            - prompt_path: Path to save the prompt in runs/
+            - response_path: Path to save the raw response in automation/runs/
+        """
+        # Create directories
+        model_dir = self.runs / model_name
+        model_dir.mkdir(parents=True, exist_ok=True)
+        automation_model_dir = self.automation_runs / model_name
+        automation_model_dir.mkdir(parents=True, exist_ok=True)
+        
+        return (
+            model_dir / f"run_{index:02d}.cpp",  # Clean code
+            model_dir / "prompt.txt",  # Prompt
+            automation_model_dir / f"run_{index:02d}.md"  # Raw response
+        )
 
     @property
     def validator(self) -> Path:

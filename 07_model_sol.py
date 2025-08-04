@@ -21,14 +21,24 @@ async def generate_one(llm, prompt, index, output_dir, logger):
     try:
         response = await llm.ainvoke(messages)
         cpp_code = extract_cpp_code(response.content)
-        file_path = output_dir / f"run_{index + 1:02d}.cpp"
+        file_path = output_dir / f"run_{index:02d}.cpp"
         file_path.write_text(cpp_code, encoding="utf-8")
         logger.info("✅ Saved: %s", file_path)
     except Exception as e:
-        logger.error(f"❌ Error generating solution {index + 1}: {e}")
+        logger.error(f"❌ Error generating solution {index}: {e}")
 
 
 async def generate_code_async(llm, problem_text, num, output_dir, logger):
+    # Find the highest existing solution index
+    existing_files = list(output_dir.glob("run_*.cpp"))
+    max_index = 0
+    for file in existing_files:
+        # Try both formats: run_01.cpp and run_1.cpp
+        match = re.search(r"run_(\d+)\.cpp", file.name)
+        if match:
+            index = int(match.group(1))
+            max_index = max(max_index, index)
+
     prompt = (
         "Generate the complete and correct C++ code only for the following problem. "
         "Do not include any explanation, comments, thoughts or reasoning. Just the code:\n\n"
@@ -36,7 +46,7 @@ async def generate_code_async(llm, problem_text, num, output_dir, logger):
     )
     tasks = [
         generate_one(llm, prompt, i, output_dir, logger)
-        for i in range(num)
+        for i in range(max_index + 1, max_index + num + 1)
     ]
     await asyncio.gather(*tasks)
 
@@ -54,7 +64,7 @@ def main():
         "qwen3-coder-480b-a35b-instruct",
         "qwen3-235b-a22b-thinking-2507",
         "doubao-seed-1-6-thinking-250715"
-    ], default="qwen3-coder-480b-a35b-instruct",
+    ], default="doubao-seed-1-6-thinking-250715",
         help="Choose model to use")
     parser.add_argument("--enable-thinking", action="store_true",
                         help="Enable internal thinking mode (Qwen only)")

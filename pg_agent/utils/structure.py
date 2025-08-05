@@ -49,7 +49,8 @@ class ProblemPaths:
         return (
             model_dir / f"run_{index:02d}.cpp",  # Clean code
             model_dir / "prompt.txt",  # Prompt
-            automation_model_dir / f"run_{index:02d}.md"  # Raw response
+            automation_model_dir / f"run_{index:02d}.md",  # Raw response
+            automation_model_dir / f"run_{index:02d}.reasoning.md"  # Reasoning
         )
 
     @property

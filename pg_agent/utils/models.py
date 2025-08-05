@@ -1,6 +1,7 @@
 import os
 import asyncio
 import httpx
+import logging
 from openai import AsyncOpenAI
 from volcenginesdkarkruntime import Ark
 from openai import OpenAI  # Used for Hunyuan
@@ -39,22 +40,28 @@ def get_llm(model_name: str):
 # ========= Custom Async LLM Wrappers =========
 
 class ChatBytedance:
-    def __init__(self, model: str, api_key: str, temperature: float = 0.5, retries: int = 3, delay: int = 3):
+    def __init__(self, model: str, api_key: str, temperature: float = None, retries: int = 3, delay: int = 3):
         self.model = model
         self.client = Ark(api_key=api_key)
         self.temperature = temperature
         self.retries = retries
         self.delay = delay
+        self.logger = logging.getLogger(__name__)
 
     async def ainvoke(self, messages):
         chat_messages = [{"role": "user", "content": m.content} for m in messages]
         for attempt in range(1, self.retries + 1):
             try:
+                params = {
+                    "model": self.model,
+                    "temperature": self.temperature,
+                }
+                self.logger.info("🤖 Invoking Doubao model with params: %s", params)
+                
                 response = await asyncio.to_thread(
                     self.client.chat.completions.create,
-                    model=self.model,
                     messages=chat_messages,
-                    temperature=self.temperature,
+                    **params
                 )
                 return response.choices[0].message
             except Exception as e:
@@ -70,7 +77,7 @@ class ChatAlibaba:
         self,
         model: str,
         api_key: str,
-        temperature: float = 0.5,
+        temperature: float = None,
         enable_thinking: bool = False,
         thinking_budget: int = 38912,
         retries: int = 3,
@@ -85,6 +92,7 @@ class ChatAlibaba:
         self.retries = retries
         self.delay = delay
         self.timeout = timeout
+        self.logger = logging.getLogger(__name__)
 
         self.is_fireworks = model.startswith("accounts/fireworks/models/")
 
@@ -113,12 +121,20 @@ class ChatAlibaba:
                         "thinking_budget": self.thinking_budget
                     }
 
+                params = {
+                    "model": self.model,
+                    "temperature": self.temperature,
+                    "stream": False,
+                    "max_tokens": 38912
+                }
+                if extra_body:
+                    params["extra_body"] = extra_body
+                
+                self.logger.info("🤖 Invoking Qwen model with params: %s", params)
+                
                 response = await self.client.chat.completions.create(
-                    model=self.model,
                     messages=chat_messages,
-                    temperature=self.temperature,
-                    stream=False,
-                    extra_body=extra_body
+                    **params
                 )
                 return response.choices[0].message
 
@@ -131,12 +147,13 @@ class ChatAlibaba:
 
 
 class ChatHunyuan:
-    def __init__(self, model: str, api_key: str, temperature: float = 0.5, retries: int = 3, delay: int = 3):
+    def __init__(self, model: str, api_key: str, temperature: float = None, retries: int = 3, delay: int = 3):
         self.model = model
         self.api_key = api_key
         self.temperature = temperature
         self.retries = retries
         self.delay = delay
+        self.logger = logging.getLogger(__name__)
 
         self.client = OpenAI(
             api_key=self.api_key,
@@ -148,12 +165,16 @@ class ChatHunyuan:
 
         for attempt in range(1, self.retries + 1):
             try:
+                params = {
+                    "model": self.model,
+                    "temperature": self.temperature
+                }
+                self.logger.info("🤖 Invoking Hunyuan model with params: %s", params)
+                
                 response = await asyncio.to_thread(
                     self.client.chat.completions.create,
-                    model=self.model,
                     messages=chat_messages,
-                    temperature=self.temperature,
-                    extra_body={"enable_enhancement": True},
+                    **params
                 )
                 return response.choices[0].message
             except Exception as e:

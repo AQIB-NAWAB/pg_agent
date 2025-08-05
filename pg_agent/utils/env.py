@@ -26,39 +26,54 @@ def load_env(model: str, provider: str = None):
     # Handle Qwen models with provider selection
     if model.startswith("qwen"):
         if provider == "fireworks":
-            api_key = os.getenv("FIREWORKS_API_KEY")
-            if not api_key:
-                raise ValueError("FIREWORKS_API_KEY not found in .env")
+            api_key = require_env("FIREWORKS_API_KEY")
+            prefix = "accounts/fireworks/models/"
             
-            model_mapping = {
-                "qwen3-coder-480b-a35b-instruct": "accounts/fireworks/models/qwen3-coder-480b-a35b-instruct",
-                "qwen3-235b-a22b-thinking-2507": "accounts/fireworks/models/qwen3-235b-a22b-thinking-2507"
-            }
-            return {
-                "api_key": api_key,
-                "model": model_mapping.get(model)
+            # Define Qwen model configs with max_tokens for Fireworks
+            model_configs = {
+                "qwen3-coder-480b-a35b-instruct": {
+                    "api_key": api_key,
+                    "model": prefix + "qwen3-coder-480b-a35b-instruct",
+                    "max_tokens": 65536
+                },
+                "qwen3-235b-a22b-thinking-2507": {
+                    "api_key": api_key,
+                    "model": prefix + "qwen3-235b-a22b-thinking-2507",
+                    "max_tokens": 38912
+                }
             }
         else:  # default to dashscope
-            return {
-                "api_key": os.getenv("DASHSCOPE_API_KEY"),
-                "model": model
+            api_key = require_env("DASHSCOPE_API_KEY")
+            
+            # Define Qwen model configs without max_tokens for Dashscope
+            model_configs = {
+                "qwen3-coder-480b-a35b-instruct": {
+                    "api_key": api_key,
+                    "model": "qwen3-coder-480b-a35b-instruct"
+                },
+                "qwen3-235b-a22b-thinking-2507": {
+                    "api_key": api_key,
+                    "model": "qwen3-235b-a22b-thinking-2507"
+                }
             }
-    
-    # Handle other models
-    model_configs = {
-        "doubao-seed-1-6-thinking-250715": {
-            "api_key": os.getenv("ARK_API_KEY"),
-            "model": os.getenv("DUBAO_MODEL_NAME", "doubao-seed-1-6-thinking-250715"),
-        },
-        "hunyuan-t1-20250711": {
-            "api_key": os.getenv("TENCENT_API_KEY"),
-            "model": "hunyuan-t1-20250711",
-        },
-        "hunyuan-turbos-20250604": {
-            "api_key": os.getenv("TENCENT_API_KEY"),
-            "model": "hunyuan-turbos-20250604",
-        },
-    }
+    else:
+        # Handle other models
+        model_configs = {
+            "doubao-seed-1-6-thinking-250715": {
+                "api_key": os.getenv("ARK_API_KEY"),
+                "model": "doubao-seed-1-6-thinking-250715",
+            },
+            "hunyuan-t1-20250711": {
+                "api_key": os.getenv("TENCENT_API_KEY"),
+                "model": "hunyuan-t1-20250711",
+                "max_tokens": 64000
+            },
+            "hunyuan-turbos-20250604": {
+                "api_key": os.getenv("TENCENT_API_KEY"),
+                "model": "hunyuan-turbos-20250604",
+                "max_tokens": 16000
+            },
+        }
     
     if model not in model_configs:
         raise ValueError(f"Unsupported model: {model}")

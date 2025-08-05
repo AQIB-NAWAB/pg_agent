@@ -40,9 +40,18 @@ def get_llm(model_name: str):
 # ========= Custom Async LLM Wrappers =========
 
 class ChatBytedance:
-    def __init__(self, model: str, api_key: str, temperature: float = None, retries: int = 3, delay: int = 3):
+    def __init__(
+        self,
+        model: str,
+        api_key: str,
+        max_tokens: int = None,
+        temperature: float = None,
+        retries: int = 3,
+        delay: int = 3
+    ):
         self.model = model
         self.client = Ark(api_key=api_key)
+        self.max_tokens = max_tokens
         self.temperature = temperature
         self.retries = retries
         self.delay = delay
@@ -54,8 +63,12 @@ class ChatBytedance:
             try:
                 params = {
                     "model": self.model,
-                    "temperature": self.temperature,
+                    "max_tokens": self.max_tokens,
+                    "temperature": self.temperature
                 }
+                # Remove None values
+                params = {k: v for k, v in params.items() if v is not None}
+                
                 self.logger.info("🤖 Invoking Doubao model with params: %s", params)
                 
                 response = await asyncio.to_thread(
@@ -77,6 +90,7 @@ class ChatAlibaba:
         self,
         model: str,
         api_key: str,
+        max_tokens: int = None,
         temperature: float = None,
         enable_thinking: bool = False,
         thinking_budget: int = 38912,
@@ -86,6 +100,7 @@ class ChatAlibaba:
     ):
         self.model = model
         self.api_key = api_key
+        self.max_tokens = max_tokens
         self.temperature = temperature
         self.enable_thinking = enable_thinking
         self.thinking_budget = thinking_budget
@@ -123,10 +138,13 @@ class ChatAlibaba:
 
                 params = {
                     "model": self.model,
+                    "max_tokens": self.max_tokens,
                     "temperature": self.temperature,
-                    "stream": False,
-                    "max_tokens": 38912
+                    "stream": False
                 }
+                # Remove None values
+                params = {k: v for k, v in params.items() if v is not None}
+                
                 if extra_body:
                     params["extra_body"] = extra_body
                 
@@ -147,9 +165,18 @@ class ChatAlibaba:
 
 
 class ChatHunyuan:
-    def __init__(self, model: str, api_key: str, temperature: float = None, retries: int = 3, delay: int = 3):
+    def __init__(
+        self,
+        model: str,
+        api_key: str,
+        max_tokens: int = None,
+        temperature: float = None,
+        retries: int = 3,
+        delay: int = 3
+    ):
         self.model = model
         self.api_key = api_key
+        self.max_tokens = max_tokens
         self.temperature = temperature
         self.retries = retries
         self.delay = delay
@@ -167,8 +194,12 @@ class ChatHunyuan:
             try:
                 params = {
                     "model": self.model,
+                    "max_tokens": self.max_tokens,
                     "temperature": self.temperature
                 }
+                # Remove None values
+                params = {k: v for k, v in params.items() if v is not None}
+                
                 self.logger.info("🤖 Invoking Hunyuan model with params: %s", params)
                 
                 response = await asyncio.to_thread(

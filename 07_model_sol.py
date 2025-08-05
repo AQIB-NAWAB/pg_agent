@@ -43,15 +43,30 @@ async def generate_one(llm, prompt, index, problem_paths, model_name, logger):
 
 
 async def generate_code_async(llm, problem_text, num, problem_paths, model_name, logger):
-    # Find the highest existing solution index
+    # Find all existing solution indexes and the highest index
     model_dir = problem_paths.runs / model_name
+    existing_indexes = set()
     max_index = 0
     if model_dir.exists():
         for file in model_dir.glob("run_*.cpp"):
             match = re.search(r"run_(\d+)\.cpp", file.name)
             if match:
                 index = int(match.group(1))
+                existing_indexes.add(index)
                 max_index = max(max_index, index)
+    
+    # Find missing indexes up to max_index
+    missing_indexes = sorted([i for i in range(1, max_index + 1) if i not in existing_indexes])
+    
+    # Get indexes to use for new solutions
+    indexes_to_use = []
+    # First use missing indexes
+    while missing_indexes and len(indexes_to_use) < num:
+        indexes_to_use.append(missing_indexes.pop(0))
+    # Then add new indexes beyond max_index if needed
+    while len(indexes_to_use) < num:
+        max_index += 1
+        indexes_to_use.append(max_index)
 
     prompt = (
         "You are an expert competitive programmer. Please solve the following problem:\n\n"
@@ -69,7 +84,7 @@ async def generate_code_async(llm, problem_text, num, problem_paths, model_name,
     
     tasks = [
         generate_one(llm, prompt, i, problem_paths, model_name, logger)
-        for i in range(max_index + 1, max_index + num + 1)
+        for i in indexes_to_use
     ]
     await asyncio.gather(*tasks)
 
@@ -98,6 +113,7 @@ def main():
                         help="Set the logging level (default: info)")
     parser.add_argument("--quiet", action="store_true",
                         help="Suppress output except errors")
+    
     args = parser.parse_args()
     model_config = load_env(model=args.model, provider=args.provider)
     log_level = logging.ERROR if args.quiet else get_log_level(args.log_level)
@@ -122,22 +138,27 @@ def main():
             sys.exit(1)
 
         use_thinking = args.enable_thinking or "thinking" in args.model.lower()
+        max_tokens = model_config.get("max_tokens", None)
 
         # Model routing
         if args.model.startswith("qwen"):
             llm = ChatAlibaba(
                 model=model_name,
                 api_key=api_key,
-                enable_thinking=use_thinking
+                enable_thinking=use_thinking,
+                max_tokens=max_tokens
             )
         elif args.model.startswith("doubao"):
             llm = ChatBytedance(
                 model=model_name,
-                api_key=api_key            )
+                api_key=api_key,
+                max_tokens=max_tokens
+            )
         elif args.model.startswith("hunyuan"):
             llm = ChatHunyuan(
                 model=model_name,
-                api_key=api_key
+                api_key=api_key,
+                max_tokens=max_tokens
             )
         else:
             raise ValueError(f"Unsupported model: {args.model}")

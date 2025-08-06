@@ -73,6 +73,22 @@ def load_env(model: str, provider: str = None):
                 "model": "hunyuan-turbos-20250604",
                 "max_tokens": 16000
             },
+             "claude-opus-4-20250514": {
+                "api_key": require_env("ANTHROPIC_API_KEY"),
+                "model": "claude-opus-4-20250514"
+            },
+            "claude-opus-4-1-20250805": {
+                "api_key": require_env("ANTHROPIC_API_KEY"),
+                "model": "claude-opus-4-1-20250805"
+            },
+            "claude-sonnet-4-20250514": {
+                "api_key": require_env("ANTHROPIC_API_KEY"),
+                "model": "claude-sonnet-4-20250514"
+            },
+            "o3": {
+                "api_key": require_env("OPENAI_API_KEY"),
+                "model": "o3"
+            }
         }
     
     if model not in model_configs:

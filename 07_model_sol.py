@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 
 from pg_agent.utils.env import load_env
-from pg_agent.utils.models import ChatBytedance, ChatAlibaba, ChatHunyuan
+from pg_agent.utils.models import get_async_llm
 from pg_agent.utils.logging import setup_logging, get_log_level
 from pg_agent.utils.structure import get_default_problem_dir, get_problem_paths
 from pg_agent.utils.parsing import extract_cpp_code
@@ -103,7 +103,11 @@ def main():
         "qwen3-235b-a22b-thinking-2507",
         "doubao-seed-1-6-thinking-250715",
         "hunyuan-t1-20250711",
-        "hunyuan-turbos-20250604"
+        "hunyuan-turbos-20250604",
+        "o3",
+        "claude-opus-4-20250514",
+    	"claude-opus-4-1-20250805",
+    	"claude-sonnet-4-20250514"
     ], default="doubao-seed-1-6-thinking-250715",
         help="Choose model to use")
     parser.add_argument("--enable-thinking", action="store_true",
@@ -140,28 +144,14 @@ def main():
         use_thinking = args.enable_thinking or "thinking" in args.model.lower()
         max_tokens = model_config.get("max_tokens", None)
 
-        # Model routing
-        if args.model.startswith("qwen"):
-            llm = ChatAlibaba(
-                model=model_name,
-                api_key=api_key,
-                enable_thinking=use_thinking,
-                max_tokens=max_tokens
-            )
-        elif args.model.startswith("doubao"):
-            llm = ChatBytedance(
-                model=model_name,
-                api_key=api_key,
-                max_tokens=max_tokens
-            )
-        elif args.model.startswith("hunyuan"):
-            llm = ChatHunyuan(
-                model=model_name,
-                api_key=api_key,
-                max_tokens=max_tokens
-            )
-        else:
-            raise ValueError(f"Unsupported model: {args.model}")
+        # Get LLM instance
+        llm = get_async_llm(
+            model_type=args.model,
+            model_name=model_name,
+            api_key=api_key,
+            max_tokens=max_tokens,
+            enable_thinking=use_thinking
+        )
         
         with open(problem_paths.problem_statement, "r", encoding="utf-8") as f:
             problem_text = f.read()

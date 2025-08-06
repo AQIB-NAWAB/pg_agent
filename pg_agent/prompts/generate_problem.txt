@@ -53,6 +53,8 @@ Use proper markdown for all mathematical expressions:
       - One sophisticated example demonstrating the problem's complexity
       - Each example must include input, output, and explanation
     - A section titled `## Notes` explaining any special considerations or hints (optional)
+5. Problem Statement should have Time(sec) limit and space(MB) Limit on the very start of the problem, according to 
+the perceived difficulty level of the optimal solution.
 
 **Additional Guidelines:**
 1. Ensure constraints are large enough to force efficient solutions

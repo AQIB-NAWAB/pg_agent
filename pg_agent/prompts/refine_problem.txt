@@ -19,6 +19,8 @@ You have written a draft of a NOI Silver Medal level (or higher) problem, and no
    - Coding complexity (handling edge cases, complex implementation details)
 3. The problem should maintain its contest-style format (no interactive problems or subtasks)
 4. All refinements should preserve or increase the problem's algorithmic sophistication
+5. Problem Statement should have Time(sec) limit and space(MB) Limit on the very start of the problem, according to 
+the perceived difficulty level of the optimal solution.
 
 **Deterministic Output Requirements:**
 1. Each valid input MUST have exactly one correct output

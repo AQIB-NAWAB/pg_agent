@@ -26,33 +26,30 @@ def load_env(model: str, provider: str = None):
     # Handle Qwen models with provider selection
     if model.startswith("qwen"):
         if provider == "fireworks":
-            api_key = require_env("FIREWORKS_API_KEY")
             prefix = "accounts/fireworks/models/"
             
             # Define Qwen model configs with max_tokens for Fireworks
             model_configs = {
                 "qwen3-coder-480b-a35b-instruct": {
-                    "api_key": api_key,
+                    "api_key": "FIREWORKS_API_KEY",
                     "model": prefix + "qwen3-coder-480b-a35b-instruct",
                     "max_tokens": 65536
                 },
                 "qwen3-235b-a22b-thinking-2507": {
-                    "api_key": api_key,
+                    "api_key": "FIREWORKS_API_KEY",
                     "model": prefix + "qwen3-235b-a22b-thinking-2507",
                     "max_tokens": 38912
                 }
             }
         else:  # default to dashscope
-            api_key = require_env("DASHSCOPE_API_KEY")
-            
             # Define Qwen model configs without max_tokens for Dashscope
             model_configs = {
                 "qwen3-coder-480b-a35b-instruct": {
-                    "api_key": api_key,
+                    "api_key": "DASHSCOPE_API_KEY",
                     "model": "qwen3-coder-480b-a35b-instruct"
                 },
                 "qwen3-235b-a22b-thinking-2507": {
-                    "api_key": api_key,
+                    "api_key": "DASHSCOPE_API_KEY",
                     "model": "qwen3-235b-a22b-thinking-2507"
                 }
             }
@@ -60,33 +57,33 @@ def load_env(model: str, provider: str = None):
         # Handle other models
         model_configs = {
             "doubao-seed-1-6-thinking-250715": {
-                "api_key": os.getenv("ARK_API_KEY"),
+                "api_key": "ARK_API_KEY",
                 "model": "doubao-seed-1-6-thinking-250715",
             },
             "hunyuan-t1-20250711": {
-                "api_key": os.getenv("TENCENT_API_KEY"),
+                "api_key": "TENCENT_API_KEY",
                 "model": "hunyuan-t1-20250711",
                 "max_tokens": 64000
             },
             "hunyuan-turbos-20250604": {
-                "api_key": os.getenv("TENCENT_API_KEY"),
+                "api_key": "TENCENT_API_KEY",
                 "model": "hunyuan-turbos-20250604",
                 "max_tokens": 16000
             },
-             "claude-opus-4-20250514": {
-                "api_key": require_env("ANTHROPIC_API_KEY"),
+            "claude-opus-4-20250514": {
+                "api_key": "ANTHROPIC_API_KEY",
                 "model": "claude-opus-4-20250514"
             },
             "claude-opus-4-1-20250805": {
-                "api_key": require_env("ANTHROPIC_API_KEY"),
+                "api_key": "ANTHROPIC_API_KEY",
                 "model": "claude-opus-4-1-20250805"
             },
             "claude-sonnet-4-20250514": {
-                "api_key": require_env("ANTHROPIC_API_KEY"),
+                "api_key": "ANTHROPIC_API_KEY",
                 "model": "claude-sonnet-4-20250514"
             },
             "o3": {
-                "api_key": require_env("OPENAI_API_KEY"),
+                "api_key": "OPENAI_API_KEY",
                 "model": "o3"
             }
         }
@@ -94,4 +91,8 @@ def load_env(model: str, provider: str = None):
     if model not in model_configs:
         raise ValueError(f"Unsupported model: {model}")
     
-    return model_configs[model]
+    # Resolve API key from environment
+    config = model_configs[model].copy()
+    config["api_key"] = require_env(config["api_key"])
+    
+    return config

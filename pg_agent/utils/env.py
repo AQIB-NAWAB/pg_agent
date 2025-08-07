@@ -38,7 +38,7 @@ def load_env(model: str, provider: str = None):
                 "qwen3-235b-a22b-thinking-2507": {
                     "api_key": "FIREWORKS_API_KEY",
                     "model": prefix + "qwen3-235b-a22b-thinking-2507",
-                    "max_tokens": 38912
+                    "max_tokens": 65536
                 }
             }
         else:  # default to dashscope

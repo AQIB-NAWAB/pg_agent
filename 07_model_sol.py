@@ -19,24 +19,29 @@ from pg_agent.utils.parsing import extract_cpp_code
 async def generate_one(llm, prompt, index, problem_paths, model_name, logger):
     messages = [HumanMessage(content=prompt)]
     try:
-        response = await llm.ainvoke(messages)
-        cpp_code = extract_cpp_code(response.content)
-        
         # Get paths for code, prompt and raw response
         code_path, prompt_path, response_path, reasoning_path = problem_paths.get_run_paths(model_name, index)
         
+        # Stream response directly to separate files
+        response = await llm.ainvoke(
+            messages,
+            response_file=response_path,
+            reasoning_file=reasoning_path,
+            stream=True,
+            run_id=index  # Pass the run index for progress tracking
+        )
+        cpp_code = extract_cpp_code(response.content)
+        
         # Save the code to runs/
         code_path.write_text(cpp_code, encoding="utf-8")
-        logger.info("✅ Saved code to: %s", code_path)
-        
-        # Save the full response to automation/runs/
-        response_path.write_text(response.content, encoding="utf-8")
-        logger.info("✅ Saved full response to: %s", response_path)
+        logger.debug("✅ Saved code to: %s", code_path)  # Changed to debug to avoid cluttering progress display
         
         # Save the reasoning to automation/runs/
         if hasattr(response, 'reasoning_content'):
             reasoning_path.write_text(response.reasoning_content, encoding="utf-8")
-            logger.info("✅ Saved reasoning to: %s", reasoning_path)
+            logger.debug("✅ Saved reasoning to: %s", reasoning_path)  # Changed to debug
+
+        logger.debug("✅ Streamed response to: %s", response_path)  # Changed to debug
         
     except Exception as e:
         logger.error(f"❌ Error generating solution {index}: {e}")
@@ -81,6 +86,28 @@ async def generate_code_async(llm, problem_text, num, problem_paths, model_name,
     _, prompt_path, _, _ = problem_paths.get_run_paths(model_name, 0)
     prompt_path.write_text(prompt, encoding="utf-8")
     logger.info("✅ Saved prompt to: %s", prompt_path)
+    
+    # Print output file paths for each run
+    print("\nOutput files:")
+    for i in indexes_to_use:
+        code_path, _, response_path, reasoning_path = problem_paths.get_run_paths(model_name, i)
+        print(f"\nRun {i}:")
+        print(f"  Code     → {code_path}")
+        print(f"  Response → {response_path}")
+        print(f"  Thinking → {reasoning_path}")
+    
+    # Get actual model parameters using the model's method
+    dummy_messages = [HumanMessage(content="test")]
+    params = await llm.get_completion_params(dummy_messages, stream=True)
+    
+    print("\nModel parameters:")
+    for k, v in params.items():
+        if k != "messages":  # Skip messages as it's not a parameter
+            print(f"  {k}: {v}")
+    
+    # Add extra newlines based on number of runs to prevent progress display from overwriting paths
+    num_runs = len(indexes_to_use)
+    print(f"\nStarting generation...{chr(10) * num_runs}\n")  # One line per run plus extra for header
     
     tasks = [
         generate_one(llm, prompt, i, problem_paths, model_name, logger)
@@ -159,7 +186,14 @@ def main():
         logger.info("🚀 Generating %d solution(s) using model: %s%s",
                     args.num, args.model,
                     " (with thinking)" if use_thinking else "")
+        
+        print("\nGeneration Progress:")
+        
         asyncio.run(generate_code_async(llm, problem_text, args.num, problem_paths, args.model, logger))
+        
+        # Add final status
+        print("\nAll generations completed!")
+        print("=" * 60)
 
     except Exception as e:
         logger.error("❌ Execution error:")

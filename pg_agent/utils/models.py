@@ -1,16 +1,14 @@
 import os
-import re
 import asyncio
 import httpx
 import logging
 import aiofiles
 from openai import AsyncOpenAI
 from volcenginesdkarkruntime import AsyncArk
-from openai import OpenAI  # Used for Hunyuan
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
-from urllib.parse import urlparse
-
+from langchain_google_genai import ChatGoogleGenerativeAI
+from typing import List, Optional
 
 def get_llm(model_name: str):
     """
@@ -74,6 +72,8 @@ def get_async_llm(model_type: str, model_name: str, api_key: str, max_tokens: in
         return AsyncOpenAIClient(**common_params)
     elif model_type.startswith("claude"):
         return AsyncAnthropicClient(**common_params)
+    elif model_type.startswith("gemini"):
+        return AsyncGeminiClient(**common_params)
     else:
         raise ValueError(f"Unsupported model type: {model_type}")
 
@@ -122,7 +122,6 @@ class AsyncLLMClient:
             if not cls._progress_header_printed:
                 print("Generation Progress:")
                 cls._progress_header_printed = True
-                return  # Return after first header print
             
             # Save cursor position and move back to progress section
             print("\0337", end="")  # Save cursor
@@ -210,14 +209,12 @@ class AsyncLLMClient:
         reasoning_content = ""
         current_lengths = {'reasoning': 0, 'response': 0}
 
-        # Initialize progress
-        await self.update_progress(run_id, "Starting", 0, 0)
-
         try:
             params = await self.get_completion_params(messages, stream)
             self.logger.debug("🤖 Invoking %s with params: %s", self.model, params)
             
             if stream:
+                await self.update_progress(run_id, "Starting", 0, 0)
                 stream_response = await self.create_completion(params)
                 
                 # Process the streaming response
@@ -457,3 +454,67 @@ class AsyncTencentClient(AsyncLLMClient):
             base_url="https://api.hunyuan.cloud.tencent.com/v1",
             http_client=httpx.AsyncClient(timeout=httpx.Timeout(600.0))
         )
+
+
+class AsyncGeminiClient(AsyncLLMClient):
+    def __init__(
+        self,
+        model: str,
+        api_key: str,
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
+        **kwargs,
+    ):
+        self.logger = logging.getLogger(__name__)
+        self.model = model
+        self.api_key = api_key
+        self.max_tokens = max_tokens
+        self.temperature = temperature
+
+        params = {
+            "model": model,
+            "temperature": temperature,
+            "max_output_tokens": max_tokens,
+        }
+        params = {k: v for k, v in params.items() if v is not None}
+        self.client = ChatGoogleGenerativeAI(
+            api_key=api_key,
+            **params
+        )
+
+    async def ainvoke(self, messages, response_file, reasoning_file, run_id, stream=True, debug=False):
+        chat_messages = [{"role": m.type, "content": m.content} for m in messages]
+
+        if not stream:
+            # Native async non-streaming call
+            response = await self.client.ainvoke(chat_messages)
+
+            async with aiofiles.open(response_file, "w", encoding="utf-8") as f:
+                await f.write(response.content)
+
+            await self.update_progress(run_id, "Completed", reasoning_len, len(response.content))
+            return response
+
+        # Initialize progress at start
+        await self.update_progress(run_id, "Starting", 0, 0)
+
+        reasoning_len = 0
+        response_len = 0
+
+        # Streaming mode: use native async streaming
+        async with aiofiles.open(response_file, "w", encoding="utf-8") as response_f:
+            async for chunk in self.client.astream(chat_messages):
+                chunk_content = chunk.content or ""
+                await response_f.write(chunk_content)
+                await response_f.flush()
+
+                response_len += len(chunk_content)
+                await self.update_progress(run_id, "Responding", reasoning_len, response_len)
+
+        await self.update_progress(run_id, "Completed", reasoning_len, response_len)
+
+        return type('Message', (), {'content': await self._read_file(response_file)})()
+
+    async def _read_file(self, file_path):
+        async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
+            return await f.read()

@@ -85,6 +85,10 @@ def load_env(model: str, provider: str = None):
             "o3": {
                 "api_key": "OPENAI_API_KEY",
                 "model": "o3"
+            },
+            "gemini-2.5-pro": {
+                "api_key": "GOOGLE_API_KEY",
+                "model": "gemini-2.5-pro"
             }
         }
     

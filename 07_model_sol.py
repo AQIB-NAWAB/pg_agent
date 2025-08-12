@@ -134,7 +134,8 @@ def main():
         "o3",
         "claude-opus-4-20250514",
     	"claude-opus-4-1-20250805",
-    	"claude-sonnet-4-20250514"
+    	"claude-sonnet-4-20250514",
+        "gemini-2.5-pro"
     ], default="doubao-seed-1-6-thinking-250715",
         help="Choose model to use")
     parser.add_argument("--enable-thinking", action="store_true",

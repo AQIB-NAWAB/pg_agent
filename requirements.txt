@@ -33,3 +33,5 @@ langchain-fireworks>=0.0.1
 
 # Frameworks and utilities Required for volcengine-python-sdk
 volcengine-python-sdk>=4.0  # Official VolcEngine SDK for Python (supports VOD, ECS, VPC, etc.)
+
+langchain-google-genai>=2.1.0

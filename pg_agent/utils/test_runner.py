@@ -4,7 +4,7 @@ import re
 import logging
 import tempfile
 
-from ..pipeline.sandbox.sandbox_utils import run_test_suite, run_single_test
+from ..pipeline.sandbox.sandbox_utils import run_test_suite
 
 logger = logging.getLogger(__name__)
 
@@ -203,71 +203,90 @@ def find_orphaned_test_inputs(test_cases_dir: Path) -> List[str]:
                 len(numbered_orphans), len(edge_orphans))
     return orphaned_inputs
 
-def run_tests(solution_code: str, test_cases: List[Dict[str, str]], time_limit: float = 5.0) -> List[Dict[str, str]]:
-    """Run tests against the provided solution code efficiently."""
+def run_tests(solution_code: str, test_cases: List[Dict[str, str]], time_limit: float = 5.0) -> Dict:
+    """
+    Run tests against the provided solution code efficiently, reads results and performance
+    stats from the sandbox output, and returns a detailed report.
+    """
     logger.info("Starting efficient test execution for %d test cases", len(test_cases))
-    failures = []
     
     if not test_cases:
-        logger.warning("No test cases provided")
-        return failures
+        return {"summary": {"status": "SUCCESS", "passed": 0, "failed": 0, "total": 0}, "results": []}
         
+    
+    
     with tempfile.TemporaryDirectory() as temp_dir:
         work_dir = Path(temp_dir)
         
         # 1. Prepare the directory for the test suite
-        solution_path = work_dir / "solution.cpp"
-        solution_path.write_text(solution_code, encoding="utf-8")
-        
+        (work_dir / "solution.cpp").write_text(solution_code, encoding="utf-8")
         for test_case in test_cases:
             (work_dir / test_case["name"]).write_text(test_case["input"], encoding="utf-8")
 
         # 2. Run the entire suite in a single container
         try:
+            # This call executes runner.sh, which now creates .out and .prof files
             run_test_suite(
-                solution_path=str(solution_path),
+                solution_path=str(work_dir / "solution.cpp"),
                 test_cases_dir=work_dir,
                 time_limit=time_limit
             )
         except Exception as e:
             logger.error("Test suite execution failed with an exception: %s", e)
-            return [{"test_name": "suite_execution", "reason": str(e)}]
+            return {"summary": {"status": "ERROR", "message": "Docker execution failed"}, "details": str(e), "results": []}
 
-        # 3. Check the results
+        # 3. Check the results and parse performance stats from .out and .prof files
+        detailed_results = []
+        passed_count, failed_count = 0, 0
+        
         for i, test_case in enumerate(test_cases, 1):
             out_file = work_dir / test_case["name"].replace(".in", ".out")
+            prof_file = work_dir / test_case["name"].replace(".in", ".prof")
             
+            # Default values
+            time_sec, mem_kb, exit_code = 0.0, 0, 1 # Default to runtime error
+            status = "RUNTIME_ERROR"
+
+            # Parse performance file if it exists
+            if prof_file.exists():
+                try:
+                    stats_line = prof_file.read_text()
+                    time_sec = float(re.search(r"TIME:([\d.]+)", stats_line).group(1))
+                    mem_kb = int(re.search(r"MEM:(\d+)", stats_line).group(1))
+                    exit_code = int(re.search(r"STATUS:(\d+)", stats_line).group(1))
+                except (AttributeError, ValueError):
+                    logger.warning(f"Could not parse stats from {prof_file.name}")
+            
+            # Determine status based on the content of the output file
             if not out_file.exists():
-                failures.append({
-                    "test_number": i, "test_name": test_case["name"],
-                    "reason": "Output file not created (likely runtime error)"
-                })
-                continue
-
-            actual_output = out_file.read_text(encoding="utf-8").strip()
-            expected_output = test_case["output"].strip()
-
-            if actual_output == "TIMEOUT":
-                logger.error("Test #%d FAILED (TIMEOUT)", i)
-                failures.append({
-                    "test_number": i, "test_name": test_case["name"],
-                    "reason": "Time Limit Exceeded"
-                })
-            elif actual_output != expected_output:
-                logger.error("Test #%d FAILED (Wrong Answer)", i)
-                failures.append({
-                    "test_number": i, "test_name": test_case["name"],
-                    "input": test_case["input"],
-                    "expected_output": expected_output,
-                    "actual_output": actual_output,
-                })
+                status = "RUNTIME_ERROR"
+                failed_count += 1
             else:
-                logger.info("Test #%d PASSED", i)
+                actual_output = out_file.read_text().strip()
+                expected_output = test_case["output"].strip()
 
-    total = len(test_cases)
-    passed_count = total - len(failures)
-    logger.info("Test Summary: %d/%d tests passed", passed_count, total)
-    if failures:
-        logger.error("Failed tests: %s", ', '.join(f['test_name'] for f in failures))
+                if actual_output == "TIMEOUT":
+                    status = "TIME_LIMIT_EXCEEDED"
+                    failed_count += 1
+                elif actual_output == "RUNTIME_ERROR":
+                    status = "RUNTIME_ERROR"
+                    failed_count += 1
+                elif actual_output != expected_output:
+                    status = "WRONG_ANSWER"
+                    failed_count += 1
+                else:
+                    status = "PASSED"
+                    passed_count += 1
             
-    return failures
+            detailed_results.append({
+                "test_name": test_case["name"],
+                "status": status,
+                "execution_time_ms": round(time_sec * 1000, 2),
+                "memory_usage_kb": mem_kb
+            })
+    
+    final_status = "SUCCESS" if failed_count == 0 else "FAILURE"
+    summary = {"status": final_status, "passed": passed_count, "failed": failed_count, "total": len(test_cases)}
+    logger.info("Test Summary: %d/%d tests passed", passed_count, len(test_cases))
+
+    return {"summary": summary, "results": detailed_results}

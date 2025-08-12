@@ -154,35 +154,56 @@ def generate_optimal_node(state: OptimalSolutionState) -> dict:
     }
 
 def test_optimal_node(state: OptimalSolutionState) -> dict:
-    """Tests the optimal solution against example cases."""
+    """
+    Tests the optimal solution, saves a detailed report for every run,
+    and creates a separate failures-only report if any tests fail.
+    The report now includes the tested code and test case path.
+    """
     logger.info("Testing optimal solution")
     
     if not state["optimal_code"]:
-        return {
-            "test_failures": [{"test_name": "generation", "reason": "No optimal code generated"}],
-            "final_verdict": "FAILURE"
-        }
+        return {"test_failures": [{"test_name": "generation", "reason": "No optimal code generated"}], "final_verdict": "FAILURE"}
     
-    # Run tests using the test runner utility
-    failures = run_tests(
+    paths = get_problem_paths(state["problem_dir_path"])
+    
+    # Run tests to get the detailed report object
+    test_report = run_tests(
         solution_code=state["optimal_code"],
         test_cases=state["example_test_cases"]
     )
+
+    # Add code and test path to the main report 
+    test_report["solution_code"] = state["optimal_code"]
+    test_report["test_cases_path"] = str(paths.test_cases)
     
+    iteration = state.get("iteration_count", 0)
+    
+    # Always save the full detailed report 
+    full_report_path = paths.optimal_dir / f"optimalSolution_v{iteration}_report.json"
+    full_report_path.write_text(json.dumps(test_report, indent=2), encoding="utf-8")
+    logger.info("Full test report saved to: %s", full_report_path)
+
+    # Check for failures based on the summary
+    summary = test_report.get("summary", {})
+    failures = summary.get("status") == "ERROR" or summary.get("failures", 0) > 0
+
     if failures:
-        # Save failures to a JSON file
-        paths = get_problem_paths(state["problem_dir_path"])
-        iteration = state.get("iteration_count", 0)
+        
+        failed_cases = [res for res in test_report.get("results", []) if res["status"] != "PASSED"]
+        failures_report = {
+            "summary": test_report["summary"],
+            "failed_tests": failed_cases,
+            "solution_code": state["optimal_code"],
+            "test_cases_path": str(paths.test_cases)
+        }
         failures_path = paths.optimal_dir / f"optimalSolution_v{iteration}_failures.json"
-        failures_path.write_text(json.dumps(failures, indent=2), encoding="utf-8")
-        logger.info("Test failures saved to: %s", failures_path)
+        failures_path.write_text(json.dumps(failures_report, indent=2), encoding="utf-8")
+        logger.info("Failures-only report saved to: %s", failures_path)
+        
+        # The state still only needs the list of failed cases for potential refinement
+        return {**state, "test_failures": failed_cases, "final_verdict": None}
     else:
-        # Copy successful solution to standard.cpp
-        paths = get_problem_paths(state["problem_dir_path"])
+        # On success, still copy the code to standard.cpp as a clear signal
         paths.standard_solution.write_text(state["optimal_code"], encoding="utf-8")
         logger.info("Copied successful solution to: %s", paths.standard_solution)
-    
-    return {
-        "test_failures": failures,
-        "final_verdict": "SUCCESS" if not failures else None
-    } 
+        return {**state, "test_failures": [], "final_verdict": "SUCCESS"}

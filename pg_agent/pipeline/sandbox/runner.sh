@@ -40,24 +40,36 @@ elif [ "$MODE" = "execute_suite" ]; then
     for infile in *.in; do
         casenum=$(basename "$infile" .in)
         outfile="${casenum}.out"
-        
+        prof_file="${casenum}.prof" # New file to store performance stats
+
         echo "Running ${EXECUTABLE_NAME} on ${infile}..."
-        if timeout "$TIME_LIMIT" ./"${EXECUTABLE_NAME}" < "$infile" > "$outfile"; then
+
+        # We use /usr/bin/time, but direct its output to the .prof file.
+        # The solution's actual stdout still goes to the .out file.
+        if /usr/bin/time -o "${prof_file}" -f "TIME:%e MEM:%M STATUS:%x" \
+            timeout "$TIME_LIMIT" ./"${EXECUTABLE_NAME}" < "$infile" > "$outfile"; then
+            # Success Case: The command finished with exit code 0.
             echo "${infile}: SUCCESS"
         else
-            if [ $? -eq 124 ]; then
+            # Failure Case: The command exited with a non-zero status.
+            exit_code=$?
+            if [ $exit_code -eq 124 ]; then
                 echo "${infile}: TIMEOUT"
                 echo "TIMEOUT" > "$outfile"
+                # Manually write stats for TLE case
+                echo "TIME:${TIME_LIMIT} MEM:0 STATUS:124" > "${prof_file}"
             else
                 echo "${infile}: RUNTIME_ERROR"
                 echo "RUNTIME_ERROR" > "$outfile"
+                # Manually write stats for Runtime Error case
+                echo "TIME:0 MEM:0 STATUS:${exit_code}" > "${prof_file}"
             fi
         fi
     done
     exit 0
-
+    
 elif [ "$MODE" = "validate_suite" ]; then
-    echo "--- Mode: VALIDATE SUITE ---"
+    echo "--- Mode: VALIDATE SUITE (Detailed) ---"
     echo "Compiling validator.cpp..."
     g++ -std=c++14 -O2 -o validator validator.cpp
 
@@ -66,22 +78,23 @@ elif [ "$MODE" = "validate_suite" ]; then
         exit 0
     fi
 
-    # Loop through all .in files in the directory
+    # Loop through all .in files and provide detailed, parsable output
     for infile in *.in; do
-        echo "--- Validating ${infile} ---"
+        test_name=$(basename "$infile")
+        echo "--- RESULT ---"
+        echo "TEST_NAME:${test_name}"
         
-        # --- THIS IS THE CRUCIAL FIX ---
-        # We run the validator and check its exit code directly in an 'if' statement.
-        # This prevents 'set -e' from terminating the whole script if the validator fails.
-        # We also redirect stderr to a temporary file to capture the error message.
+        # We run the validator and check its exit code directly.
+        # Stderr is captured to get the reason for invalid cases.
         if ./validator < "${infile}" 2> validator_error.log; then
-            echo "VALID: ${infile}"
+            echo "STATUS:VALID"
         else
-            # If it failed, print the reason from the error log.
-            # The '|| true' ensures this command doesn't fail if the log is empty.
-            echo "INVALID: ${infile} REASON: $(cat validator_error.log || true)"
+            REASON=$(cat validator_error.log || echo "Unknown validation error")
+            echo "STATUS:INVALID"
+            echo "REASON_START"
+            echo "${REASON}"
+            echo "REASON_END"
         fi
-        # --- END OF FIX ---
     done
     exit 0
 

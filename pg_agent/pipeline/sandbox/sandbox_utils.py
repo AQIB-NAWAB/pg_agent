@@ -53,38 +53,88 @@ def run_generator_script(script_path: str, output_dir: Path):
     if status_code != 0:
         raise Exception(f"Generator script failed:\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}")
 
-def run_validation_suite(validator_path: str, all_input_files: List[Path]) -> Tuple[List[Path], List[Dict[str, str]]]:
-    """Validates a whole directory of .in files in a single container run."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        work_dir = Path(temp_dir)
+def run_validation_suite(validator_path: str, all_input_files: List[Path]) -> Dict:
+    """
+    Uses the central Docker utility to run a validator against all test cases
+    and returns a detailed report object.
+    """
+    debug = True
+
+    if not all_input_files:
+        if(debug): print("No input files to validate.")
+        return {"summary": {"status": "SUCCESS", "message": "No input files to validate."}, "results": []}
+    
+    with tempfile.TemporaryDirectory() as temp_dir_str:
+        work_dir = Path(temp_dir_str)
+        # Prepare the temporary directory with the validator and all input files
         shutil.copy(validator_path, work_dir / "validator.cpp")
         for in_file in all_input_files:
             shutil.copy(in_file, work_dir / in_file.name)
         
-        runner_sh_content = (Path(__file__).parent / "runner.sh").read_text().replace('\r\n', '\n')
-        (work_dir / "runner.sh").write_text(runner_sh_content, newline='\n')
-        os.chmod(work_dir / "runner.sh", 0o755)
+        # Do not use shutil.copy for shell scripts due to line ending issues.
+        # Instead, read the content, normalize line endings to LF (\n),
+        # and write it back out to ensure Linux compatibility.
+        runner_sh_path = Path(__file__).parent / "runner.sh"
+        if runner_sh_path.exists():
+            runner_content = runner_sh_path.read_text(encoding="utf-8").replace('\r\n', '\n')
+            (work_dir / "runner.sh").write_text(runner_content, encoding="utf-8", newline='\n')
+            (work_dir / "runner.sh").chmod(0o755)
+        else:
+            raise FileNotFoundError(f"runner.sh not found at expected location: {runner_sh_path}")
 
+        # Define the command to be executed inside the container
         command = "/bin/bash runner.sh validate_suite"
-        status_code, stdout, stderr = _run_command_in_container(DOCKER_IMAGE_TAG, command, work_dir)
         
-        if status_code != 0:
-            raise Exception(f"Validation suite execution failed:\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}")
-            
-        valid_files, invalid_files = [], []
-        original_paths = {p.name: p for p in all_input_files}
-        for line in stdout.splitlines():
-            if line.startswith("VALID:"):
-                filename = line.split(":", 1)[1].strip()
-                if filename in original_paths:
-                    valid_files.append(original_paths[filename])
-            elif line.startswith("INVALID:"):
-                parts = line.split(" REASON: ", 1)
-                filename = parts[0].split(":", 1)[1].strip()
-                reason = parts[1].strip() if len(parts) > 1 else "Unknown validation error"
-                invalid_files.append({"file": filename, "reason": reason})
+        try:
+            if debug:
+                print(f"Running validation suite in {work_dir}")
+
+            status_code, stdout, stderr = _run_command_in_container(
+                DOCKER_IMAGE_TAG, command, work_dir
+            )
+            if status_code != 0:
+                raise Exception(stderr)
                 
-        return valid_files, invalid_files
+            results_output = stdout
+
+        except Exception as e:
+            if debug:
+                print(f"Error running validation suite: {e}")
+            return {"summary": {"status": "ERROR", "message": "Docker execution for validation failed."}, "details": str(e), "results": []}
+
+        # (The rest of the function remains the same...)
+        detailed_results = []
+        valid_count, invalid_count = 0, 0
+        
+        result_blocks = results_output.strip().split("--- RESULT ---")[1:]
+        if debug:
+            print(f"Found {len(result_blocks)} result blocks in output")
+
+        for block in result_blocks:
+            try:
+                test_name = re.search(r"TEST_NAME:(.*)", block).group(1).strip()
+                status = re.search(r"STATUS:(.*)", block).group(1).strip()
+                result_item = {"test_name": test_name, "status": status}
+
+                if status == "INVALID":
+                    reason = re.search(r"REASON_START\n(.*)\nREASON_END", block, re.DOTALL).group(1).strip()
+                    result_item["reason"] = reason
+                    invalid_count += 1
+                else:
+                    valid_count += 1
+                
+                detailed_results.append(result_item)
+            except Exception:
+                invalid_count += 1
+                detailed_results.append({"test_name": "unknown", "status": "PARSING_ERROR"})
+
+    if debug:
+        print(f"Validation complete: {valid_count} valid, {invalid_count} invalid out of {len(all_input_files)} total")
+        
+    final_status = "SUCCESS" if invalid_count == 0 else "FAILURE"
+    summary = {"status": final_status, "valid": valid_count, "invalid": invalid_count, "total": len(all_input_files)}
+
+    return {"summary": summary, "results": detailed_results}
 
 def run_test_suite(solution_path: str, test_cases_dir: Path, time_limit: float):
     """

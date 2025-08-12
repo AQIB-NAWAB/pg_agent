@@ -73,7 +73,7 @@ def load_scripts_node(state: TestSuiteState) -> dict:
     return result
 
 def validate_inputs_node(state: TestSuiteState) -> dict:
-    """Runs the validator script against all test cases."""
+    """Runs the validator script against all test cases and gets a detailed report."""
     if state["generation_mode"] != "validator":
         logger.info("Skipping validation (not in validator mode)")
         return {}
@@ -81,27 +81,28 @@ def validate_inputs_node(state: TestSuiteState) -> dict:
     print("--- Validating all test input files ---")
     paths = get_problem_paths(state['problem_dir_path'])
     
-    # Collect all input files to validate
     all_inputs = list(paths.test_cases.glob("*.in"))
+
+    #debugging output
+    print(f"Found {len(all_inputs)} input files in {paths.test_cases}")
     
     if not all_inputs:
         logger.warning("No input files found to validate.")
-        return {"valid_test_inputs": [], "invalid_tests": []}
+        return {"validation_report": {"summary": {"status": "SUCCESS", "message": "No input files found."}}}
 
-    valid_paths, invalid_dicts = run_validation_suite(state['validator_path'], all_inputs)
-            
-    # Log invalid test cases
-    for invalid in invalid_dicts:
-        logger.warning(f"Invalid test case file '{invalid['file']}'. Reason: {invalid['reason']}")
+    # Call the new detailed validation runner
+    validation_report = run_validation_suite(state['validator_path'], all_inputs)
+    
+    # Log invalid test cases from the new report structure
+    invalid_tests = [res for res in validation_report.get("results", []) if res["status"] == "INVALID"]
+    for invalid in invalid_tests:
+        logger.warning(f"Invalid test case file '{invalid['test_name']}'. Reason: {invalid.get('reason', 'N/A')}")
 
     print(f"Validation complete:")
-    print(f"- Valid tests: {len(valid_paths)}")
-    print(f"- Invalid tests: {len(invalid_dicts)}")
+    print(f"- Valid tests: {validation_report.get('summary', {}).get('valid', 0)}")
+    print(f"- Invalid tests: {validation_report.get('summary', {}).get('invalid', 0)}")
     
-    return {
-        "valid_test_inputs": [str(p) for p in valid_paths],
-        "invalid_tests": invalid_dicts
-    }
+    return {"validation_report": validation_report}
 
 def generate_outputs_node(state: TestSuiteState) -> dict:
     """Generates outputs for test cases using the selected solution."""
@@ -171,19 +172,22 @@ def generate_outputs_node(state: TestSuiteState) -> dict:
     }
 
 def finalize_node(state: TestSuiteState) -> dict:
-    """Cleanup and finalize the workflow."""
+    """Cleanup and save final reports."""
     paths = get_problem_paths(state['problem_dir_path'])
     
-    # Save test case log if there are any failed/invalid tests
+    # Save detailed validation report
+    if state.get("validation_report"):
+        report_path = paths.automation_dir / "validation_report.json"
+        report_path.write_text(
+            json.dumps(state["validation_report"], indent=2),
+            encoding="utf-8"
+        )
+        logger.info(f"Detailed validation report saved to {report_path}")
+
+    # Save test case log for output generation failures
     invalid_tests = state.get("invalid_tests", [])
-    if invalid_tests:
-        paths.test_cases.mkdir(parents=True, exist_ok=True)
-        # Use different filenames for validation and generation failures
-        if state["generation_mode"] == "validator":
-            log_path = paths.test_cases / "invalid_testcases.json"
-        else:  # outputs mode
-            log_path = paths.test_cases / "failed_testcases.json"
-            
+    if invalid_tests and state["generation_mode"] == "outputs":
+        log_path = paths.test_cases / "failed_testcases.json"
         log_path.write_text(
             json.dumps(invalid_tests, indent=2),
             encoding="utf-8"
@@ -194,4 +198,4 @@ def finalize_node(state: TestSuiteState) -> dict:
     if run_dir.exists():
         shutil.rmtree(run_dir)
         logger.info("Cleaned up temporary directory")
-    return {} 
+    return {}

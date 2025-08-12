@@ -140,43 +140,58 @@ def generate_or_refine_bruteforce_node(state: BruteForceState) -> BruteForceStat
     }
 
 def test_bruteforce_node(state: BruteForceState) -> BruteForceState:
-    """Tests the bruteforce solution against example cases."""
+    """
+    Tests the bruteforce solution, saves a detailed report for every run,
+    and creates a separate failures-only report if any tests fail.
+    """
     print("--- Testing bruteforce against examples ---")
     
-    problem_dir = Path(state['problem_dir_path'])
-    paths = get_problem_paths(str(problem_dir))
+    paths = get_problem_paths(str(state['problem_dir_path']))
     
     if not state["example_test_cases"]:
         print("Warning: No example test cases found to validate against.")
-        return {
-            **state,
-            "test_failures": [],
-            "final_verdict": "SUCCESS"  # No tests to run, consider it a success
-        }
+        return {**state, "test_failures": [], "final_verdict": "SUCCESS"}
 
-    # Run tests using the test runner utility
-    failures = run_tests(
+    # Run tests to get the detailed report object
+    test_report = run_tests(
         solution_code=state["bruteforce_code"],
         test_cases=state["example_test_cases"]
     )
     
+    # Add code and test path to the main report 
+    test_report["solution_code"] = state["bruteforce_code"]
+    test_report["test_cases_path"] = str(paths.test_cases)
+    
+    iteration = state.get("iteration_count", 0)
+    
+    # Always save the full detailed report 
+    full_report_path = paths.automation_bruteforce_dir / f"bruteforceSolution_v{iteration}_report.json"
+    full_report_path.write_text(json.dumps(test_report, indent=2), encoding="utf-8")
+    print(f"Full test report saved to: {full_report_path}")
+
+    # Check for failures based on the summary
+    summary = test_report.get("summary", {})
+    failures = summary.get("status") == "ERROR" or summary.get("failures", 0) > 0
+    
     if failures:
-        print(f"--- Test FAILED on {len(failures)} examples. ---")
-        # Save failures to a JSON file
-        iteration = state.get("iteration_count", 0)
+        # Create and save a separate, smaller failures-only report ---
+        failed_cases = [res for res in test_report.get("results", []) if res["status"] != "PASSED"]
+        failures_report = {
+            "summary": test_report["summary"],
+            "failed_tests": failed_cases,
+            "solution_code": state["bruteforce_code"],
+            "test_cases_path": str(paths.test_cases)
+        }
         failures_path = paths.automation_bruteforce_dir / f"bruteforceSolution_v{iteration}_failures.json"
-        failures_path.write_text(json.dumps(failures, indent=2), encoding="utf-8")
+        failures_path.write_text(json.dumps(failures_report, indent=2), encoding="utf-8")
+        print(f"Failures-only report saved to: {failures_path}")
+        
+        return {**state, "test_failures": failed_cases, "final_verdict": None}
     else:
         print("--- All examples PASSED. ---")
-        # Copy successful solution to solution_bf.cpp
         paths.bruteforce_solution.write_text(state["bruteforce_code"], encoding="utf-8")
         print(f"Copied successful solution to: {paths.bruteforce_solution}")
-        
-    return {
-        **state,
-        "test_failures": failures,
-        "final_verdict": "SUCCESS" if not failures else None
-    }
+        return {**state, "test_failures": [], "final_verdict": "SUCCESS"}
 
 def _save_bruteforce_solution(problem_dir: Path, solution_code: str, version: int) -> Path:
     """Saves the bruteforce solution with specified version number.

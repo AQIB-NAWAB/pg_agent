@@ -21,7 +21,7 @@ dependencies = [
     "pydantic>=2.6.1",
     "questionary>=2.1.0",
     "langchain-fireworks>=0.0.1",
-    "volcengine-python-sdk>=4.0"
+    "volcengine-python-sdk>=4.0",
     "langchain-google-genai>=2.1.0"
 ]
 

@@ -143,6 +143,36 @@ python 06_test_suite.py [problem_dir] [options]
   --quiet           Suppress all output except errors
 ```
 
+### 3.7 Model Solution Generator (`07_model_sol.py`)
+
+Generates C++ solutions using various LLM models (Qwen, Doubao, Hunyuan, Claude, Gemini, etc.) with support for multiple runs and thinking mode.
+
+```bash
+python 07_model_sol.py [problem_dir] [options]
+  --model MODEL      Model to use:
+                     qwen3-coder-480b-a35b-instruct
+                     qwen3-235b-a22b-thinking-2507
+                     doubao-seed-1-6-thinking-250715
+                     hunyuan-t1-20250711
+                     hunyuan-turbos-20250604
+                     o3
+                     claude-opus-4-20250514
+                     claude-opus-4-1-20250805
+                     claude-sonnet-4-20250514
+                     gemini-2.5-pro
+  --num NUM          Number of completions to generate (default: 1)
+  --provider PROVIDER  LLM provider: dashscope/fireworks (default: dashscope, applicable only for Qwen models)
+  --log-level LEVEL  Set logging level
+  --quiet           Suppress output except errors
+```
+
+**Features:**
+- Generates multiple solution runs with automatic indexing
+- Streams responses to separate files (code, response, reasoning)
+- Supports thinking mode for enhanced reasoning
+- Handles missing run indexes intelligently
+- Progress tracking and detailed output paths
+
 ### Typical Workflow
 
 1. Generate problem statement: `python 01_problem_statement.py`

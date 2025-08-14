@@ -123,8 +123,8 @@ def main():
                         help=f"Path to problem directory (default: {default_dir})")
     parser.add_argument("--num", type=int, default=1,
                         help="Number of completions to generate")
-    parser.add_argument("--provider", choices=["dashscope", "fireworks"], default="fireworks",
-                    help="LLM provider to use for Qwen models (default: fireworks)")
+    parser.add_argument("--provider", choices=["dashscope", "fireworks"], default="dashscope",
+                    help="LLM provider to use for Qwen models (default: dashscope)")
     parser.add_argument("--model", choices=[
         "qwen3-coder-480b-a35b-instruct",
         "qwen3-235b-a22b-thinking-2507",

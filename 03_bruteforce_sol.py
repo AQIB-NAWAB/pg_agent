@@ -1,11 +1,8 @@
-import os
 import sys
-import json
 import argparse
 import logging
 import traceback
 from pathlib import Path
-from dotenv import load_dotenv
 from langgraph.graph import StateGraph, END
 
 from pg_agent.nodes.bruteforce_nodes import (
@@ -16,6 +13,8 @@ from pg_agent.nodes.bruteforce_nodes import (
 )
 from pg_agent.utils.logging import setup_logging, get_log_level
 from pg_agent.utils.structure import get_default_problem_dir, get_problem_paths
+from pg_agent.utils.models import get_llm
+from pg_agent.utils.env import get_available_models, default_model, load_env
 
 def build_bruteforce_graph() -> StateGraph:
     """Builds the graph for generating and refining bruteforce solutions."""
@@ -41,16 +40,14 @@ def get_next_version(problem_dir: Path) -> int:
 
 def main():
     """Parse command line arguments and run the workflow."""
-    load_dotenv()
-
     default_dir = get_default_problem_dir()
     parser = argparse.ArgumentParser(description="Generate a bruteforce solution for a programming problem")
     parser.add_argument("problem_dir", nargs="?", default=default_dir,
                         help=f"Path to the problem directory (default: {default_dir})")
     parser.add_argument("--refine", type=str, nargs='?', const='',
                         help="Refine previous solution. Optionally provide feedback for improvement.")
-    parser.add_argument("--model", type=str, default="o3",
-                        help="LLM model to use (e.g., o3, gpt-4, claude-3-sonnet)")
+    parser.add_argument("--model", type=str, choices=get_available_models("bruteforce_sol"), default=default_model("bruteforce_sol"),
+                        help=f"Model to use (default: {default_model('bruteforce_sol')})")
     parser.add_argument("--log-level", type=str, default="info",
                         choices=['debug', 'info', 'warning', 'error', 'critical'],
                         help="Set the logging level (default: info)")
@@ -82,6 +79,10 @@ def main():
     # Get the next version number
     next_version = get_next_version(problem_dir)
 
+    # Load model
+    model_config = load_env(model=args.model)
+    llm = get_llm(model_config)
+
     # Prepare initial state
     initial_state: BruteForceState = {
         "problem_dir_path": str(problem_dir),
@@ -93,7 +94,7 @@ def main():
         "human_feedback": args.refine if args.refine is not None else None,
         "final_verdict": None,
         "final_bruteforce_path": None,
-        "llm_model": args.model  # <-- Model support added here
+        "llm": llm  
     }
 
     # Run the workflow

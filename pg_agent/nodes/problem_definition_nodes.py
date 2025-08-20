@@ -18,17 +18,17 @@ class ProblemDefinitionState(TypedDict):
     previous_problem: Optional[str]
     problem_statement: str
     test_cases: List[Tuple[str, str]]
+    llm: object
 
-def get_llm_client():
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key: raise ValueError("OPENAI_API_KEY not found in environment.")
-    return ChatOpenAI(model="o3", api_key=api_key)
+def _get_llm_from_state(state: dict):
+    """Return LLM from state if provided, else default client."""
+    return state.get("llm")
 
 def generate_problem_statement(state: dict) -> dict:
     """Generate initial problem statement."""
     prompt_path = Path(__file__).parent.parent / "prompts/generate_problem.txt"
     prompt = ChatPromptTemplate.from_template(prompt_path.read_text(encoding="utf-8"))
-    chain = prompt | get_llm_client()
+    chain = prompt | _get_llm_from_state(state)
     response = chain.invoke({
         "topics": state.get("topics") or "None",
         "previous_problem": state.get("previous_problem") or "None",
@@ -62,7 +62,7 @@ def refine_problem_statement(state: dict) -> dict:
     
     prompt_path = Path(__file__).parent.parent / "prompts/refine_problem.txt"
     prompt = ChatPromptTemplate.from_template(prompt_path.read_text(encoding="utf-8"))
-    chain = prompt | get_llm_client()
+    chain = prompt | _get_llm_from_state(state)
     response = chain.invoke({
         "problem_statement": problem_statement,
         "human_feedback": state["human_feedback"],
@@ -82,7 +82,7 @@ def extract_examples(state: dict) -> dict:
     # First run the formatting chain
     prompt_path = Path(__file__).parent.parent / "prompts/format_test_cases.txt"
     prompt = ChatPromptTemplate.from_template(prompt_path.read_text(encoding="utf-8"))
-    chain = prompt | get_llm_client()
+    chain = prompt | _get_llm_from_state(state)
     response = chain.invoke({"problem_statement": problem_statement})
     
     # Then parse the formatted test cases

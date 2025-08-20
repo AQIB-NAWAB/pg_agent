@@ -1,11 +1,8 @@
-import os
 import sys
-import json
 import argparse
 import logging
 import traceback
 from pathlib import Path
-from dotenv import load_dotenv
 from langgraph.graph import StateGraph, END
 
 from pg_agent.nodes.optimal_nodes import (
@@ -16,6 +13,8 @@ from pg_agent.nodes.optimal_nodes import (
 )
 from pg_agent.utils.logging import setup_logging, get_log_level
 from pg_agent.utils.structure import get_default_problem_dir, get_problem_paths
+from pg_agent.utils.models import get_llm
+from pg_agent.utils.env import get_available_models, default_model, load_env
 
 def get_next_version(problem_dir: Path) -> int:
     """Get the next version number for optimal solution."""
@@ -41,22 +40,21 @@ def build_optimal_graph() -> StateGraph:
 
 def main():
     """Parse command line arguments and run the workflow."""
-    load_dotenv()
-
     default_dir = get_default_problem_dir()
     parser = argparse.ArgumentParser(description="Generate an optimal solution for a programming problem")
     parser.add_argument("problem_dir", nargs="?", default=default_dir,
-                       help=f"Path to the problem directory (default: {default_dir})")
-    
+                        help=f"Path to the problem directory (default: {default_dir})")
+    parser.add_argument("--model", type=str, choices=get_available_models("optimal_sol"), default=default_model("optimal_sol"),
+                        help=f"Model to use (default: {default_model('optimal_sol')})")
     parser.add_argument("--refine", type=str, nargs='?', const='',
-                       help="Refine previous solution. Optionally provide feedback for improvement.")
+                        help="Refine previous solution. Optionally provide feedback for improvement.")
     parser.add_argument("--time-limit", type=float, default=5,
-                       help="Time limit for solution execution in seconds (default: 5)")
+                        help="Time limit for solution execution in seconds (default: 5)")
     parser.add_argument("--log-level", type=str, default="info",
-                       choices=['debug', 'info', 'warning', 'error', 'critical'],
-                       help="Set the logging level (default: info)")
+                        choices=['debug', 'info', 'warning', 'error', 'critical'],
+                        help="Set the logging level (default: info)")
     parser.add_argument("--quiet", action="store_true",
-                       help="Suppress all output except errors (equivalent to --log-level error)")
+                        help="Suppress all output except errors (equivalent to --log-level error)")
     
     args = parser.parse_args()
 
@@ -91,6 +89,10 @@ def main():
     # Get the next version number
     next_version = get_next_version(problem_dir)
 
+    # Load model
+    model_config = load_env(model=args.model)
+    llm = get_llm(model_config)
+
     # Prepare initial state
     initial_state: OptimalSolutionState = {
         "problem_dir_path": str(problem_dir),
@@ -104,7 +106,9 @@ def main():
         "human_feedback": args.refine if args.refine is not None else None,
         "is_refinement": args.refine is not None,  # True if --refine was used
         "final_verdict": None,
-        "final_optimal_path": None
+        "final_optimal_path": None,
+        "llm": llm
+
     }
 
     # Run the workflow

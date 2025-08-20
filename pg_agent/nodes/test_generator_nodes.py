@@ -3,7 +3,7 @@ import re
 import json
 import logging
 from pathlib import Path
-from typing import TypedDict, Optional, Literal
+from typing import Any, TypedDict, Optional, Literal
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from ..utils.structure import get_problem_paths
@@ -24,18 +24,13 @@ class TestCaseGeneratorState(TypedDict):
     refine_mode: bool  # Whether to refine existing generator
     user_feedback: str  # User feedback for refinement
     generation_mode: Literal["basic", "edge", "validator", "all"]  # The generation mode to use
-
+    llm: Any  # LLM client injected from workflow
+    
 def _extract_cpp_code(response_content: str) -> str:
     """Parses the LLM's response to extract only the C++ code."""
     match = re.search(r'```(?:cpp)?\s*([\s\S]+?)\s*```', response_content)
     if match: return match.group(1).strip()
     return response_content.strip()
-
-def get_llm_client():
-    """Creates an OpenAI client, reading the key from the environment."""
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key: raise ValueError("OPENAI_API_KEY not found in environment.")
-    return ChatOpenAI(model="o3", api_key=api_key)
 
 def load_context_node(state: TestCaseGeneratorState) -> dict:
     """Loads the problem statement and bruteforce solution if available.
@@ -100,7 +95,8 @@ def _create_generation_node(prompt_file_name: str, output_key: str, version_key:
         # Prepare prompt and invoke LLM
         prompt_path = Path(__file__).parent.parent / "prompts" / prompt_name
         prompt = ChatPromptTemplate.from_template(prompt_path.read_text(encoding="utf-8"))
-        chain = prompt | get_llm_client()
+        llm = state["llm"]
+        chain = prompt | llm
         
         # Include existing code and feedback in prompt if refining
         variables = {

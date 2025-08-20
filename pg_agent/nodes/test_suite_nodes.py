@@ -35,6 +35,7 @@ class TestSuiteState(TypedDict):
     valid_test_inputs: Optional[List[str]]  # Paths to valid test inputs
     invalid_tests: Optional[List[dict]]  # Details about invalid test cases
 
+
 def load_scripts_node(state: TestSuiteState) -> dict:
     """Loads the required C++ scripts from the problem root directory."""
     print(f"--- Loading scripts from: {state['problem_dir_path']} ---")

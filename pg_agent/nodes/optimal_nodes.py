@@ -27,12 +27,7 @@ class OptimalSolutionState(TypedDict):
     is_refinement: bool  # Whether we're in refinement mode
     final_verdict: Optional[Literal["SUCCESS", "FAILURE"]]
     final_optimal_path: Optional[str]
-
-def get_llm_client():
-    """Creates an OpenAI client, reading the key from the environment."""
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key: raise ValueError("OPENAI_API_KEY not found in environment.")
-    return ChatOpenAI(model="o3", api_key=api_key)
+    llm: any  # LLM client injected from workflow
 
 def load_context_node(state: OptimalSolutionState) -> dict:
     """Loads problem statement, bruteforce solution, and example test cases."""
@@ -69,10 +64,12 @@ def load_context_node(state: OptimalSolutionState) -> dict:
 def generate_optimal_node(state: OptimalSolutionState) -> dict:
     """Generates an optimal solution based on problem statement and bruteforce solution."""
     logger.info("Generating optimal solution")
-    
-    # Check if we're in refinement mode
+
+	# Check if we're in refinement mode
+    paths = get_problem_paths(state["problem_dir_path"])
+    variables = {"problem_statement": state["problem_statement"], "bruteforce_code": state["bruteforce_code"]}
+
     if state["is_refinement"]:
-        paths = get_problem_paths(state["problem_dir_path"])
         prev_version = state.get("iteration_count", 0) - 1
         
         # Load previous optimal solution
@@ -122,7 +119,7 @@ def generate_optimal_node(state: OptimalSolutionState) -> dict:
     logger.debug("=" * 80)
     
     # Generate solution
-    chain = prompt | get_llm_client()
+    chain = prompt | state["llm"]
     response = chain.invoke(variables)
     
     # Extract code from response
@@ -131,9 +128,8 @@ def generate_optimal_node(state: OptimalSolutionState) -> dict:
         raise ValueError("Could not extract code from LLM response")
     
     optimal_code = code_match.group(1).strip()
-    
-    # Save the generated solution
-    paths = get_problem_paths(state["problem_dir_path"])
+
+    # Save solution
     iteration = state.get("iteration_count", 0)
     solution_path = paths.get_optimal_path(iteration)
     

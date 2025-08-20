@@ -3,7 +3,7 @@ import re
 import json
 import logging
 from pathlib import Path
-from typing import TypedDict, List, Tuple, Optional
+from typing import TypedDict, List, Tuple, Optional, Any
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from ..utils.parsing import parse_test_cases
@@ -11,12 +11,13 @@ from ..utils.structure import get_problem_paths
 
 logger = logging.getLogger(__name__)
 
-class SimpleTestGenerationState(TypedDict):
+class SimpleTestGenerationState(TypedDict, total=False):
     """State for simple test case generation workflow."""
     output_dir: str
     problem_statement: str
     test_cases: List[Tuple[str, str]]
     parse_only: bool  # Whether to only parse tests from latest response
+    llm: Any  # Optional: custom LLM client to use
 
 def get_llm_client():
     """Creates an OpenAI client, reading the key from the environment."""
@@ -136,7 +137,11 @@ def generate_simple_test_cases(state: SimpleTestGenerationState) -> SimpleTestGe
         prompt_path = Path(__file__).parent.parent / "prompts/gen_manual_tests.txt"
         logger.info("Using prompt from: %s", prompt_path)
         prompt = ChatPromptTemplate.from_template(prompt_path.read_text(encoding="utf-8"))
-        chain = prompt | get_llm_client()
+
+        # Use provided LLM if available, else default
+        llm_client = state.get("llm", get_llm_client())
+        chain = prompt | llm_client
+        
         response = chain.invoke({"problem_statement": state["problem_statement"]})
         logger.info("Generated test cases from LLM")
         

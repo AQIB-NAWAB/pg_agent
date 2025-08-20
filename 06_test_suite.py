@@ -5,10 +5,7 @@ import json
 import argparse
 import logging
 import traceback
-from pathlib import Path
-from dotenv import load_dotenv
 from langgraph.graph import StateGraph, END
-
 from pg_agent.nodes.test_suite_nodes import (
     TestSuiteState,
     load_scripts_node,
@@ -49,7 +46,6 @@ def build_test_suite_graph(mode: str = "outputs") -> StateGraph:
 
 def main():
     """Parse command line arguments and run the workflow."""
-    load_dotenv()
 
     default_dir = get_default_problem_dir()
     parser = argparse.ArgumentParser(
@@ -61,7 +57,7 @@ def main():
     # Add time limit option for bruteforce solution
     parser.add_argument("--time-limit", type=float, default=2.0,
                        help="Time limit in seconds for solution execution (default: 2.0)")
-    
+
     # Update mode choices
     parser.add_argument("--mode", type=str, default="outputs",
                        choices=["validator", "outputs"],
@@ -128,7 +124,7 @@ def main():
         "validator_path": "",
         "run_dir_path": "",
         "valid_test_inputs": None,
-        "invalid_tests": None
+        "invalid_tests": None,
     }
 
     # Run the workflow

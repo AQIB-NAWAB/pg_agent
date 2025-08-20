@@ -1,51 +1,46 @@
 import os
 import asyncio
 import httpx
-import logging
+import logging, json
 import aiofiles
 from openai import AsyncOpenAI
 from volcenginesdkarkruntime import AsyncArk
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
-from typing import List, Optional
+from typing import Optional
 
-def get_llm(model_name: str):
+logger = logging.getLogger(__name__)
+
+
+def get_llm(
+    model_config: dict
+):
     """
-    Returns an instance of a LangChain-compatible LLM based on the model name.
-
-    Supported:
-    - "gpt*" or "o3": ChatOpenAI
-    - "claude*": ChatAnthropic
-
-    Raises:
-    - ValueError for unsupported model names or missing API keys.
+    Returns a LangChain-compatible LLM instance based on model name or config dict.
     """
-    if model_name.startswith("gpt") or model_name == "o3":
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY not set.")
-        return ChatOpenAI(model=model_name, api_key=api_key)
+    common_params = {
+        "model": model_config["model"],
+        "api_key": model_config["api_key"],
+        "max_tokens": model_config["parameters"].get("max_tokens", None)
+    }
+    common_params = {k: v for k, v in common_params.items() if v is not None}
 
-    elif model_name.startswith("claude"):
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise ValueError("ANTHROPIC_API_KEY not set.")
-        return ChatAnthropic(model=model_name, api_key=api_key)
-
+    # Instantiate the correct client
+    if model_config["provider"] == "openai":
+        return ChatOpenAI(**common_params)
+    elif model_config["provider"] == "anthropic":
+        return ChatAnthropic(**common_params)
+    elif model_config["provider"] == "google":
+        return ChatGoogleGenerativeAI(**common_params)
     else:
-        raise ValueError(f"Unsupported model: {model_name}")
+        raise ValueError(f"Unsupported model: {model_config['model']}")
 
-
-def get_async_llm(model_type: str, model_name: str, api_key: str, max_tokens: int = None, enable_thinking: bool = False):
+def get_async_llm(model_config):
     """Get an async LLM client instance based on the model type.
     
     Args:
-        model_type: The type/provider of the model (e.g. "qwen", "claude", "o3")
-        model_name: The specific model name/identifier
-        api_key: The API key for the model provider
-        max_tokens: Maximum number of tokens to generate
-        enable_thinking: Enable thinking mode for models that support it (Alibaba only)
+        model_config: The model configuration dictionary
         
     Returns:
         An instance of AsyncLLMClient or its subclasses
@@ -54,28 +49,29 @@ def get_async_llm(model_type: str, model_name: str, api_key: str, max_tokens: in
         ValueError: If the model type is not supported
     """
     common_params = {
-        "model": model_name,
-        "api_key": api_key,
-        "max_tokens": max_tokens
+        "model": model_config["model"],
+        "api_key": model_config["api_key"],
+        "max_tokens": model_config["parameters"].get("max_tokens", None)
     }
+    common_params = {k: v for k, v in common_params.items() if v is not None}
     
-    if model_type.startswith("qwen"):
+    if model_config["provider"] == "fireworks" or model_config["provider"] == "dashscope":
         return AsyncAlibabaClient(
             **common_params,
-            enable_thinking=enable_thinking
+            enable_thinking=model_config["parameters"].get("enable_thinking", False)
         )
-    elif model_type.startswith("doubao"):
+    elif model_config["provider"] == "bytedance":
         return AsyncBytedanceClient(**common_params)
-    elif model_type.startswith("hunyuan"):
+    elif model_config["provider"] == "tencent":
         return AsyncTencentClient(**common_params)
-    elif model_type.startswith("o3"):
+    elif model_config["provider"] == "openai":
         return AsyncOpenAIClient(**common_params)
-    elif model_type.startswith("claude"):
+    elif model_config["provider"] == "anthropic":
         return AsyncAnthropicClient(**common_params)
-    elif model_type.startswith("gemini"):
+    elif model_config["provider"] == "google":
         return AsyncGeminiClient(**common_params)
     else:
-        raise ValueError(f"Unsupported model type: {model_type}")
+        raise ValueError(f"Unsupported model: {model_config['model']}")
 
 
 class AsyncLLMClient:

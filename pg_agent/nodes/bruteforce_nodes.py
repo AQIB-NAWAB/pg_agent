@@ -3,7 +3,7 @@ import re
 import json
 import logging
 from pathlib import Path
-from typing import TypedDict, List, Dict, Optional, Tuple
+from typing import TypedDict, List, Dict, Optional, Tuple, Any
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
@@ -29,7 +29,8 @@ class BruteForceState(TypedDict):
     final_verdict: Optional[str]  # Final status of the solution generation
     final_bruteforce_path: Optional[str]  # Path to the final saved solution
     llm_model: Optional[str]  
-
+    llm: Any
+    
 def load_problem_statement_node(state: BruteForceState) -> BruteForceState:
     """Loads the problem statement and example test cases."""
     print(f"--- Loading problem from: {state['problem_dir_path']} ---")
@@ -74,8 +75,7 @@ def generate_or_refine_bruteforce_node(state: BruteForceState) -> BruteForceStat
     print(f"--- {'Refining' if is_refinement else 'Generating'} bruteforce solution ---")
 
     # Load appropriate prompt template
-    model = state.get("llm_model", "o3")
-    llm = get_llm(model)
+    llm = state["llm"]
 
     prompt_name = "refine_bruteforce.txt" if is_refinement else "gen_bruteforce.txt"
     prompt_path = Path(__file__).parent.parent / "prompts" / prompt_name

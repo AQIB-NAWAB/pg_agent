@@ -44,12 +44,24 @@ def _run_command_in_container(image_tag: str, command: str, work_dir: Path, inpu
     return process.returncode, stdout, stderr
 
 def run_generator_script(script_path: str, output_dir: Path):
-    """Compiles and runs a generator script inside the mounted output_dir."""
+    """Compiles and runs a generator script inside the mounted output_dir using runner.sh."""
     work_dir = output_dir
     work_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy(script_path, work_dir / "generator.cpp")
-    command = "g++ -std=c++14 -O2 -o generator generator.cpp && ./generator"
+    
+    # Copy and prepare runner.sh
+    runner_sh_path = Path(__file__).parent / "runner.sh"
+    if runner_sh_path.exists():
+        runner_content = runner_sh_path.read_text(encoding="utf-8").replace('\r\n', '\n')
+        (work_dir / "runner.sh").write_text(runner_content, encoding="utf-8", newline='\n')
+        (work_dir / "runner.sh").chmod(0o755)
+    else:
+        raise FileNotFoundError(f"runner.sh not found at expected location: {runner_sh_path}")
+    
+    # Use runner.sh to generate test cases
+    command = "/bin/bash runner.sh generate"
     status_code, stdout, stderr = _run_command_in_container(DOCKER_IMAGE_TAG, command, work_dir)
+    print(f"Generator script output:\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}")
     if status_code != 0:
         raise Exception(f"Generator script failed:\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}")
 

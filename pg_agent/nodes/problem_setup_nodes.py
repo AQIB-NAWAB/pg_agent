@@ -31,18 +31,4 @@ def setup_problem_directory(state: ProblemSetupState) -> ProblemSetupState:
     # Copy template files that don't exist
     _copy_if_not_exists(template_path, output_path)
     
-    # If no topics provided, select random topics
-    if not state.get('topics'):
-        topics_path = Path(__file__).parent.parent.parent / "topics.json"
-        all_topics = json.loads(topics_path.read_text(encoding="utf-8"))
-        all_topic_choices = []
-        for top_level_value in all_topics.values():
-            if isinstance(top_level_value, dict):
-                for category_list in top_level_value.values(): all_topic_choices.extend(category_list)
-            elif isinstance(top_level_value, list):
-                all_topic_choices.extend(top_level_value)
-        selected_topics = random.sample(all_topic_choices, k=random.randint(1, 2))
-        topics = ", ".join(selected_topics)
-        state['topics'] = topics
-
     return state 

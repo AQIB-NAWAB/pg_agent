@@ -197,7 +197,7 @@ class AsyncLLMClient:
         
         return result
 
-    async def ainvoke(self, messages, response_file, reasoning_file, run_id, stream=True, debug=True):
+    async def ainvoke(self, messages, response_file, reasoning_file, run_id, stream=True, debug=False):
         """Generic implementation of async invocation with progress tracking."""
 
         # Initialize tracking variables

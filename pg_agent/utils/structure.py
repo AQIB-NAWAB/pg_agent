@@ -8,16 +8,17 @@ class ProblemPaths:
         self.root = problem_dir
         self.reports_dir = self.root / "reports"  # Directory for reports
         self.problem_statement = self.root / "problem_statement.md"  # Problem statement file
-        # Core problem files
+        
+        # Core problem files in root directory
         self.standard_solution = self.root / "standard.cpp"
         self.bruteforce_solution = self.root / "solution_bf.cpp"  # Main bruteforce solution path
         self.root_validator = self.root / "validator.cpp"  # Validator in root directory
         
-        # Generator files in root
+        # Generator files in root directory (for easy access)
         self.test_generator = self.root / "test_generator.cpp"  # Basic test generator
         self.edge_generator = self.root / "edge_generator.cpp"  # Edge case generator
         
-        # Automation directory structure
+        # Automation directory structure (for versioned files and settings)
         self.automation = self.root / "automation"
         self.automation_bruteforce_dir = self.automation / "bruteForceSol"
         self.automation_settings = self.automation / "automation_settings.json"
@@ -27,6 +28,9 @@ class ProblemPaths:
         self.automation_validator = self.automation / "validator.cpp"  # Validator in automation directory
         self.runs = self.root / "runs"  # Directory for model runs (clean code)
         self.automation_runs = self.automation / "runs"  # Directory for raw model outputs
+        
+        # Test case generator script directory in automation (for versioned files)
+        self.testcase_gen_script_dir = self.automation / "testcaseGenScript"
 
     def get_run_paths(self, model_name: str, index: int) -> tuple[Path, Path, Path]:
         """Gets the paths for code and response files for a specific run.
@@ -80,6 +84,45 @@ class ProblemPaths:
             json.dumps(settings, indent=2, sort_keys=True),
             encoding="utf-8"
         )
+
+    def get_testcase_gen_script_path(self, script_type: str, version: int) -> Path:
+        """Gets the path for a specific version of test case generator script in automation directory.
+        
+        Args:
+            script_type: Type of script (e.g., "basicTestcaseGenerator", "edgeTestcaseGenerator", "testcaseValidator")
+            version: Version number
+            
+        Returns:
+            Path to the versioned script file in automation/testcaseGenScript/
+        """
+        return self.testcase_gen_script_dir / f"{script_type}_v{version}.cpp"
+
+    def get_root_generator_path(self, script_type: str) -> Path:
+        """Gets the appropriate root directory path for a generator type.
+        
+        Args:
+            script_type: Type of script (e.g., "basicTestcaseGenerator", "edgeTestcaseGenerator", "testcaseValidator")
+            
+        Returns:
+            Path to the appropriate root directory file (e.g., test_generator.cpp, edge_generator.cpp, validator.cpp)
+        """
+        mapping = {
+            "basicTestcaseGenerator": self.test_generator,
+            "edgeTestcaseGenerator": self.edge_generator,
+            "testcaseValidator": self.validator
+        }
+        return mapping.get(script_type)
+
+    def get_script_type_from_version_key(self, version_key: str) -> str:
+        """Extracts the script type from a version key.
+        
+        Args:
+            version_key: Version key (e.g., "basicTestcaseGeneratorVersion")
+            
+        Returns:
+            Script type (e.g., "basicTestcaseGenerator")
+        """
+        return version_key.replace("Version", "")
 
 def get_default_problem_dir() -> Optional[str]:
     """Get the default problem directory from settings."""

@@ -3,20 +3,15 @@
 MODE=$1
 
 if [ "$MODE" = "generate" ]; then
-    GENERATION_ID=$2
-    echo "--- Mode: GENERATE (Batch #${GENERATION_ID}) ---"
+    echo "--- Mode: GENERATE ---"
     
-    echo "Compiling testcaseGenerator.cpp..."
-    g++ -std=c++14 -O2 -o testcaseGenerator testcaseGenerator.cpp
+    echo "Compiling generator.cpp..."
+    g++ -std=c++20 -O2 -o generator generator.cpp
     
-    OUTPUT_DIR="generation${GENERATION_ID}"
-    mkdir -p "$OUTPUT_DIR"
+    echo "Running generator..."
+    ./generator
     
-    cd "$OUTPUT_DIR"
-    echo "Running testcaseGenerator..."
-    ../testcaseGenerator
-    
-    echo "Test cases generated in ${OUTPUT_DIR}"
+    echo "Test cases generated in current directory"
 
 elif [ "$MODE" = "execute_suite" ]; then
     TIME_LIMIT=$2

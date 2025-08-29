@@ -9,17 +9,20 @@ from pg_agent.nodes.test_generator_nodes import (
     gen_basic_tests_node,
     gen_edge_tests_node,
     gen_validator_node,
+    run_basic_test_generator_node,
+    run_edge_test_generator_node,
 )
 from pg_agent.utils.logging import setup_logging, get_log_level
 from pg_agent.utils.structure import get_default_problem_dir, get_problem_paths
 from pg_agent.utils.models import get_llm
 from pg_agent.utils.env import get_available_models, default_model, load_env
 
-def build_test_generator_graph(mode: str = "basic") -> StateGraph:
+def build_test_generator_graph(mode: str = "basic", exec_only: bool = False) -> StateGraph:
     """Builds the graph for generating test cases and validator.
     
     Args:
         mode: The generation mode to use ("basic", "edge", "validator", or "all")
+        exec_only: If True, skip generation and only execute existing generators
     """
     workflow = StateGraph(TestCaseGeneratorState)
     
@@ -28,25 +31,47 @@ def build_test_generator_graph(mode: str = "basic") -> StateGraph:
     workflow.add_node("gen_basic_tests", gen_basic_tests_node)
     workflow.add_node("gen_edge_tests", gen_edge_tests_node)
     workflow.add_node("gen_validator", gen_validator_node)
+    workflow.add_node("run_basic_generator", run_basic_test_generator_node)
+    workflow.add_node("run_edge_generator", run_edge_test_generator_node)
     
-    # Define flow based on mode
+    # Define flow based on mode and exec_only flag
     workflow.set_entry_point("load_context")
     
-    if mode == "basic" or mode == "all":
-        workflow.add_edge("load_context", "gen_basic_tests")
+    if exec_only:
+        # In exec-only mode, skip generation and go directly to execution
         if mode == "basic":
-            workflow.add_edge("gen_basic_tests", END)
-    
-    if mode == "edge" or mode == "all":
-        prev_node = "gen_basic_tests" if mode == "all" else "load_context"
-        workflow.add_edge(prev_node, "gen_edge_tests")
-        if mode == "edge":
-            workflow.add_edge("gen_edge_tests", END)
-    
-    if mode == "validator" or mode == "all":
-        prev_node = "gen_edge_tests" if mode == "all" else "load_context"
-        workflow.add_edge(prev_node, "gen_validator")
-        workflow.add_edge("gen_validator", END)
+            workflow.add_edge("load_context", "run_basic_generator")
+            workflow.add_edge("run_basic_generator", END)
+        elif mode == "edge":
+            workflow.add_edge("load_context", "run_edge_generator")
+            workflow.add_edge("run_edge_generator", END)
+        elif mode == "all":
+            workflow.add_edge("load_context", "run_basic_generator")
+            workflow.add_edge("run_basic_generator", "run_edge_generator")
+            workflow.add_edge("run_edge_generator", END)
+        else:  # validator mode
+            # For validator mode in exec-only, we still need to generate it
+            workflow.add_edge("load_context", "gen_validator")
+            workflow.add_edge("gen_validator", END)
+    else:
+        # Normal generation mode
+        if mode == "basic" or mode == "all":
+            workflow.add_edge("load_context", "gen_basic_tests")
+            workflow.add_edge("gen_basic_tests", "run_basic_generator")
+            if mode == "basic":
+                workflow.add_edge("run_basic_generator", END)
+        
+        if mode == "edge" or mode == "all":
+            prev_node = "run_basic_generator" if mode == "all" else "load_context"
+            workflow.add_edge(prev_node, "gen_edge_tests")
+            workflow.add_edge("gen_edge_tests", "run_edge_generator")
+            if mode == "edge":
+                workflow.add_edge("run_edge_generator", END)
+        
+        if mode == "validator" or mode == "all":
+            prev_node = "run_edge_generator" if mode == "all" else "load_context"
+            workflow.add_edge(prev_node, "gen_validator")
+            workflow.add_edge("gen_validator", END)
     
     return workflow.compile()
 
@@ -54,15 +79,35 @@ def main():
     """Parse command line arguments and run the workflow."""
 
     default_dir = get_default_problem_dir()
-    parser = argparse.ArgumentParser(description="Generate test cases and validator for a programming problem")
+    parser = argparse.ArgumentParser(
+        description="Generate test cases and validator for a programming problem",
+        epilog="""
+Examples:
+  # Generate basic test cases
+  python 05_test_generator.py problem_dir --mode basic
+  
+  # Execute existing basic generator without regenerating
+  python 05_test_generator.py problem_dir --mode basic --exec-only
+  
+  # Execute all existing generators without regenerating
+  python 05_test_generator.py problem_dir --mode all --exec-only
+  
+  # Generate edge cases and execute them
+  python 05_test_generator.py problem_dir --mode edge
+        """
+    )
     parser.add_argument("problem_dir", nargs="?", default=default_dir,
                         help=f"Path to the problem directory (default: {default_dir})")
     
     # Replace skip flags with mode selection
-    parser.add_argument("--mode", type=str, default="basic",
+    parser.add_argument("--mode", type=str, default="all",
                         choices=["basic", "edge", "validator", "all"],
                         help="Generation mode: basic (50 tests), edge (5-10 edge cases), "
                              "validator (test case validator), or all (run all modes)")
+    
+    # Add exec-only flag that can be combined with any mode
+    parser.add_argument("--exec-only", action="store_true",
+                        help="Only execute existing generators without generating new ones (can be combined with --mode)")
 
     parser.add_argument("--model", type=str, choices=get_available_models("test_generator"), default=default_model("test_generator"),
                         help=f"Model to use (default: {default_model('test_generator')})")
@@ -104,6 +149,21 @@ def main():
     if not problem_paths.automation_settings.exists():
         logger.error("Error: automation_settings.json not found. Please run bruteforce generator first.")
         sys.exit(1)
+    
+    # If exec-only mode is enabled, check that required generators exist
+    if args.exec_only:
+        missing_generators = []
+        if args.mode in ["basic", "all"] and not problem_paths.test_generator.exists():
+            missing_generators.append("test_generator.cpp")
+        if args.mode in ["edge", "all"] and not problem_paths.edge_generator.exists():
+            missing_generators.append("edge_generator.cpp")
+        
+        if missing_generators:
+            logger.error("Error: --exec-only mode requested but the following generators are missing:")
+            for generator in missing_generators:
+                logger.error("  - %s", generator)
+            logger.error("Please generate the missing generators first or remove the --exec-only flag.")
+            sys.exit(1)
 
     # Load model
     model_config = load_env(model=args.model)
@@ -121,41 +181,60 @@ def main():
         "refine_mode": args.refine is not None,  # True if --refine is provided
         "user_feedback": args.refine or "",  # Use feedback from --refine argument
         "generation_mode": args.mode,
-        "llm": llm
+        "llm": llm,
+        "generated_test_cases": None
     }
 
     # Run the workflow
-    graph = build_test_generator_graph(mode=args.mode)
+    graph = build_test_generator_graph(mode=args.mode, exec_only=args.exec_only)
     
     try:
         final_state = graph.invoke(initial_state)
         logger.info("--- Workflow Finished ---")
         
-        # Report status based on mode
-        if args.mode in ["basic", "all"]:
-            if final_state.get("basic_test_gen_path"):
-                logger.info("✓ Basic test generator created: %s", final_state['basic_test_gen_path'])
-            else:
-                logger.error("✗ Failed to generate basic tests")
-                
-        if args.mode in ["edge", "all"]:
-            if final_state.get("edge_test_gen_path"):
-                logger.info("✓ Edge case generator created: %s", final_state['edge_test_gen_path'])
-            else:
-                logger.error("✗ Failed to generate edge cases")
-                
-        if args.mode in ["validator", "all"]:
-            if final_state.get("validator_path"):
-                logger.info("✓ Test case validator created: %s", final_state['validator_path'])
-            else:
-                logger.error("✗ Failed to generate validator")
+        # Report status based on mode and exec_only flag
+        if args.exec_only:
+            logger.info("✓ Executed existing generators in exec-only mode")
+        else:
+            if args.mode in ["basic", "all"]:
+                if final_state.get("basic_test_gen_path"):
+                    logger.info("✓ Basic test generator created: %s", final_state['basic_test_gen_path'])
+                else:
+                    logger.error("✗ Failed to generate basic tests")
+                    
+            if args.mode in ["edge", "all"]:
+                if final_state.get("edge_test_gen_path"):
+                    logger.info("✓ Edge case generator created: %s", final_state['edge_test_gen_path'])
+                else:
+                    logger.error("✗ Failed to generate edge cases")
+                    
+            if args.mode in ["validator", "all"]:
+                if final_state.get("validator_path"):
+                    logger.info("✓ Test case validator created: %s", final_state['validator_path'])
+                else:
+                    logger.error("✗ Failed to generate validator")
         
-        # Check if any requested component failed
-        if ((args.mode in ["basic", "all"] and not final_state.get("basic_test_gen_path")) or
-            (args.mode in ["edge", "all"] and not final_state.get("edge_test_gen_path")) or
-            (args.mode in ["validator", "all"] and not final_state.get("validator_path"))):
-            logger.error("Some components failed to generate.")
-            sys.exit(1)
+        # Report test case generation status
+        generated_cases = final_state.get("generated_test_cases", {})
+        if generated_cases:
+            total_cases = sum(len(cases) for cases in generated_cases.values())
+            logger.info("=" * 60)
+            logger.info("🎉 TEST CASE GENERATION COMPLETED SUCCESSFULLY!")
+            logger.info("=" * 60)
+            logger.info("✓ Generated %d test cases total", total_cases)
+            for category, cases in generated_cases.items():
+                logger.info("  - %s: %d test cases", category, len(cases))
+            logger.info("=" * 60)
+        else:
+            logger.warning("No test cases were generated")
+        
+        # Check if any requested component failed (only for non-exec-only modes)
+        if not args.exec_only:
+            if ((args.mode in ["basic", "all"] and not final_state.get("basic_test_gen_path")) or
+                (args.mode in ["edge", "all"] and not final_state.get("edge_test_gen_path")) or
+                (args.mode in ["validator", "all"] and not final_state.get("validator_path"))):
+                logger.error("Some components failed to generate.")
+                sys.exit(1)
             
     except Exception as e:
         logger.error("Error occurred:")

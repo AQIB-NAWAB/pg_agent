@@ -56,16 +56,18 @@ def main():
     
     # Add time limit option for bruteforce solution
     parser.add_argument("--time-limit", type=float, default=5.0,
-                       help="Time limit in seconds for solution execution (default: 5.0)")
+                       help="Time limit in seconds for bruteforce solution execution (default: 5.0)")
 
     # Update mode choices
     parser.add_argument("--mode", type=str, default="outputs",
                        choices=["validator", "outputs"],
                        help="Operation mode: validator (validate test inputs) or outputs (generate outputs)")
     
-    # Add solution selection flag
-    parser.add_argument("--use-optimal", action="store_true",
-                       help="Use optimal solution (standard.cpp) instead of bruteforce solution (solution_bf.cpp) for output generation")
+    # Replace --use-optimal with new flags
+    parser.add_argument("--use-bf-only", action="store_true",
+                       help="Use only bruteforce solution (solution_bf.cpp) for output generation")
+    parser.add_argument("--use-opt-only", action="store_true",
+                       help="Use only optimal solution (standard.cpp) for output generation")
     
     # Add logging control arguments
     parser.add_argument("--log-level", type=str, default="info",
@@ -96,6 +98,15 @@ def main():
         logger.error("Problem statement not found at %s", paths.problem_statement)
         sys.exit(1)
 
+    # Determine which solutions to run
+    run_bruteforce = not args.use_opt_only  # Run bruteforce unless only optimal is requested
+    run_optimal = not args.use_bf_only      # Run optimal unless only bruteforce is requested
+    
+    # Validate that at least one solution type is selected
+    if not run_bruteforce and not run_optimal:
+        logger.error("At least one solution type must be selected")
+        sys.exit(1)
+
     # Check required files based on mode
     if args.mode == "validator":
         if not paths.root_validator.exists() and not paths.automation_validator.exists():
@@ -105,26 +116,36 @@ def main():
             logger.error("Please run test generator workflow first or create validator manually.")
             sys.exit(1)
     else:  # outputs mode
-        solution_path = paths.standard_solution if args.use_optimal else paths.bruteforce_solution
-        if not solution_path.exists():
-            logger.error("Solution not found at %s", solution_path)
-            if args.use_optimal:
-                logger.error("Please ensure standard.cpp exists or use --use-optimal flag.")
-            else:
-                logger.error("Please ensure solution_bf.cpp exists or run bruteforce generator first.")
+        # Check that at least one solution exists
+        solutions_exist = False
+        if run_bruteforce and paths.bruteforce_solution.exists():
+            solutions_exist = True
+        if run_optimal and paths.standard_solution.exists():
+            solutions_exist = True
+        
+        if not solutions_exist:
+            logger.error("No valid solutions found:")
+            if run_bruteforce:
+                logger.error("  - Bruteforce solution not found at %s", paths.bruteforce_solution)
+            if run_optimal:
+                logger.error("  - Optimal solution not found at %s", paths.standard_solution)
+            logger.error("Please ensure required solution files exist or adjust the --use-bf-only/--use-opt-only flags.")
             sys.exit(1)
 
-    # Prepare initial state
+    # Prepare initial state - the generate_outputs_node will handle both solutions
     initial_state: TestSuiteState = {
         "problem_dir_path": str(paths.root),
         "bruteforce_time_limit": args.time_limit,
         "generation_mode": args.mode,
-        "use_optimal": args.use_optimal,
-        "solution_path": "",  # Will be loaded by load_scripts
+        "use_bruteforce": run_bruteforce,  # Whether to use bruteforce solution
+        "use_optimal": run_optimal,        # Whether to use optimal solution
+        "solutions_to_process": [],        # Will be populated by load_scripts_node
+        "solution_path": "",               # Will be loaded by load_scripts
         "validator_path": "",
         "run_dir_path": "",
         "valid_test_inputs": None,
         "invalid_tests": None,
+        "current_solution_index": 0,
     }
 
     # Run the workflow

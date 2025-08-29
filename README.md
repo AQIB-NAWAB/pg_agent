@@ -173,6 +173,37 @@ python 07_model_sol.py [problem_dir] [options]
 - Handles missing run indexes intelligently
 - Progress tracking and detailed output paths
 
+### 3.8 External Models Tester (`08_models_tester.py`)
+
+A tool for evaluating AI-generated C++ solutions against test cases in a secure Docker environment. It can generate solutions using various LLM models and test them with detailed performance reporting.
+
+**Key Features:**
+- Test solutions with configurable resource limits (`--memory`, `--cpus`, `--time-limit`)
+- Flexible testing modes: single solution, directory, or all solutions
+- Detailed reporting with performance metrics and error analysis
+- Smart diff generation for wrong answers
+- Docker-based sandboxed execution
+- Generate solutions from multiple models (`--generate --models` or `--all`)
+
+**Usage Examples:**
+```bash
+# Quick test a single solution
+python 08_models_tester.py ./problem/ --test --solution runs/model_A/run_1.cpp
+
+# Full test suite for a specific model
+python 08_models_tester.py ./problem/ --test --solutions-dir runs/model_A --full
+
+# Generate and test solutions from all models
+python 08_models_tester.py ./problem/ --generate --all --num 3 --test
+```
+
+**Prerequisites:**
+- Python 3.11+ with required packages
+- Docker Desktop installed and running
+- API keys configured in `.env` for model access
+
+For detailed documentation and all available options, see the script's help: `python 08_models_tester.py --help`
+
 ### Typical Workflow
 
 1. Generate problem statement: `python 01_problem_statement.py`

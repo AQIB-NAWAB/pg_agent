@@ -24,7 +24,7 @@ Analyze the existing edge case generator and improve it based on the provided fe
 - Maintain the focus on boundary conditions and corner cases
 - Ensure all test cases still strictly follow problem constraints
 - Keep or improve the descriptive comments for each test case
-- Continue using the `edge_*.in` naming format
+- Continue using the `test_edge_*.in` naming format
 - The first line must remain `#include <bits/stdc++.h>`
 - Continue using `using namespace std;`
 

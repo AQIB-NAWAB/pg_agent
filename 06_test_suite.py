@@ -55,8 +55,8 @@ def main():
                        help=f"Path to the problem directory (default: {default_dir})")
     
     # Add time limit option for bruteforce solution
-    parser.add_argument("--time-limit", type=float, default=2.0,
-                       help="Time limit in seconds for solution execution (default: 2.0)")
+    parser.add_argument("--time-limit", type=float, default=5.0,
+                       help="Time limit in seconds for solution execution (default: 5.0)")
 
     # Update mode choices
     parser.add_argument("--mode", type=str, default="outputs",

@@ -6,8 +6,9 @@ class ProblemPaths:
     """Represents the standard paths within a problem directory."""
     def __init__(self, problem_dir: Path):
         self.root = problem_dir
+        self.reports_dir = self.root / "reports"  # Directory for reports
+        self.problem_statement = self.root / "problem_statement.md"  # Problem statement file
         # Core problem files
-        self.problem_statement = self.root / "problem_statement.md"
         self.standard_solution = self.root / "standard.cpp"
         self.bruteforce_solution = self.root / "solution_bf.cpp"  # Main bruteforce solution path
         self.root_validator = self.root / "validator.cpp"  # Validator in root directory

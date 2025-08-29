@@ -137,7 +137,9 @@ def generate_outputs_node(state: TestSuiteState) -> dict:
         run_test_suite(
             solution_path=state['solution_path'],
             test_cases_dir=temp_dir,
-            time_limit=state['bruteforce_time_limit']
+            time_limit=state['bruteforce_time_limit'],
+            memory_limit=512,
+            run_full_suite=True
         )
         
         # Process results

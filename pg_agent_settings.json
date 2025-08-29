@@ -7,6 +7,7 @@
     "_comment_4": "1. 'system_default': (Recommended) Uses your OS's default application for .txt/.cpp files.",
     "_comment_5": "2. 'code --wait': Use this for Visual Studio Code (requires 'code' in your system's PATH).",
     "_comment_6": "3. Any other CLI command for an editor, e.g., 'subl --wait', 'notepad++'.",
+    "smart_diff_line_threshold": 50,
     "workflow_parameters": {
         "_comment": "These values control the behavior of the generation and refinement loops.",
         "max_refinement_iterations": 5,
@@ -16,23 +17,23 @@
     },
     "problem_statement": {
         "models": ["o3", "gpt-5", "claude-sonnet-4-20250514", "claude-opus-4-1-20250805", "gemini-2.5-pro"],
-        "default_model": "o3"
+        "default_model": "gpt-5"
     },
     "manual_tests": {
         "models": ["o3", "gpt-5", "claude-sonnet-4-20250514", "claude-opus-4-1-20250805", "gemini-2.5-pro"],
-        "default_model": "o3"
+        "default_model": "gpt-5"
     },
     "bruteforce_sol": {
         "models": ["o3", "gpt-5", "claude-sonnet-4-20250514", "claude-opus-4-1-20250805", "gemini-2.5-pro"],
-        "default_model": "o3"
+        "default_model": "gpt-5"
     },
     "optimal_sol": {
         "models": ["o3", "gpt-5", "claude-sonnet-4-20250514", "claude-opus-4-1-20250805", "gemini-2.5-pro"],
-        "default_model": "o3"
+        "default_model": "gpt-5"
     },
     "test_generator": {
         "models": ["o3", "gpt-5", "claude-opus-4-1-20250805", "claude-sonnet-4-20250514", "gemini-2.5-pro"],
-        "default_model": "o3"
+        "default_model": "gpt-5"
     },
     "test_suite": {
     },

@@ -136,7 +136,7 @@ def run_validation_suite(validator_path: str, all_input_files: List[Path]) -> Di
 
     return {"summary": summary, "results": detailed_results}
 
-def run_test_suite(solution_path: str, test_cases_dir: Path, time_limit: float):
+def run_test_suite(solution_path: str, test_cases_dir: Path, time_limit: float, memory_limit: int, run_full_suite: bool):
     """
     Runs a single solution against a directory of test cases efficiently.
     Compiles once, then runs all tests in a single container.
@@ -157,14 +157,15 @@ def run_test_suite(solution_path: str, test_cases_dir: Path, time_limit: float):
     (work_dir / "runner.sh").write_text(runner_sh_content, newline='\n')
     os.chmod(work_dir / "runner.sh", 0o755)
 
-    command = f"/bin/bash runner.sh execute_suite {time_limit} solution.cpp solution_executable"
+    command = f"./runner.sh execute_suite {time_limit} {memory_limit} {run_full_suite} solution.cpp solution_executable"
     status_code, stdout, stderr = _run_command_in_container(DOCKER_IMAGE_TAG, command, work_dir=work_dir)
     
     if status_code != 0:
-        raise Exception(f"Test suite execution failed:\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}")
-    
-    print(stdout) # Print the output for debugging
-    
+        raise Exception(f"Test suite execution failed:\nSTATUS_CODE:\n{status_code}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}")
+
+    return stdout, stderr
+
+
 def run_solution_on_test_case(solution_path: str, input_file: Path, time_limit: float) -> (bool, str):
     """Runs a solution against an input file with a timeout. Returns (timed_out, output)."""
     with tempfile.TemporaryDirectory() as temp_dir:

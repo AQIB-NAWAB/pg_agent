@@ -1,9 +1,5 @@
 #!/bin/bash
 
-# Exit immediately if a command exits with a non-zero status.
-# We will handle errors gracefully within the script where needed.
-set -e
-
 MODE=$1
 
 if [ "$MODE" = "generate" ]; then
@@ -24,46 +20,56 @@ if [ "$MODE" = "generate" ]; then
 
 elif [ "$MODE" = "execute_suite" ]; then
     TIME_LIMIT=$2
-    SOLUTION_FILE=$3 
-    EXECUTABLE_NAME=$4
+    MEMORY_LIMIT=$3
+    RUN_FULL_SUITE=$4
+    SOLUTION_FILE=$5
+    EXECUTABLE_NAME=$6
 
-    echo "--- Mode: EXECUTE SUITE (Time Limit: ${TIME_LIMIT}s) ---"
+    g++ -std=c++20 -O2 -w -o "${EXECUTABLE_NAME}" "${SOLUTION_FILE}" 2> compilation_error.log
+    compile_exit_code=$?
     
-    echo "Compiling ${SOLUTION_FILE}..."
-    g++ -std=c++14 -O2 -o "${EXECUTABLE_NAME}" "${SOLUTION_FILE}"
-    
-    if ! ls -d *.in > /dev/null 2>&1; then
-        echo "Warning: No .in files found in this directory to execute against."
+    if [ $compile_exit_code -ne 0 ]; then
+        echo "COMPILATION_FAILED"
+        echo "ERROR_LOG_START"
+        cat compilation_error.log
+        echo "ERROR_LOG_END"
+        exit 0
+    fi
+    echo "COMPILATION_SUCCESS"
+
+    if ! ls -d ./*.in > /dev/null 2>&1; then
         exit 0
     fi
     
-    for infile in *.in; do
+    # Create ordered list of test files following priority:
+    # 1. example_*.in
+    # 2. test_*.in (excluding test_edge_*)
+    # 3. [0-9]*.in
+    # 4. test_edge_*.in
+    for infile in $(find "./" -name "example_*.in" | sort -V) \
+                  $(find "./" -name "test_[0-9]*.in" | sort -V) \
+                  $(find "./" -name "[0-9]*.in" | sort -V) \
+                  $(find "./" -name "test_edge_*.in" | sort -V); do
+        echo "INFILE: ${infile}"
         casenum=$(basename "$infile" .in)
         outfile="${casenum}.out"
-        prof_file="${casenum}.prof" # New file to store performance stats
+        prof_file="${casenum}.prof"
 
-        echo "Running ${EXECUTABLE_NAME} on ${infile}..."
+        /usr/bin/time -o "${prof_file}" -f "TIME:%e MEM:%M" timeout "$TIME_LIMIT" ./"${EXECUTABLE_NAME}" < "$infile" > "$outfile"
+        exit_code=$?
+        
+        # Write the captured exit code into the profile file
+        echo "STATUS:${exit_code}" >> "${prof_file}"
 
-        # We use /usr/bin/time, but direct its output to the .prof file.
-        # The solution's actual stdout still goes to the .out file.
-        if /usr/bin/time -o "${prof_file}" -f "TIME:%e MEM:%M STATUS:%x" \
-            timeout "$TIME_LIMIT" ./"${EXECUTABLE_NAME}" < "$infile" > "$outfile"; then
-            # Success Case: The command finished with exit code 0.
-            echo "${infile}: SUCCESS"
-        else
-            # Failure Case: The command exited with a non-zero status.
-            exit_code=$?
-            if [ $exit_code -eq 124 ]; then
-                echo "${infile}: TIMEOUT"
-                echo "TIMEOUT" > "$outfile"
-                # Manually write stats for TLE case
-                echo "TIME:${TIME_LIMIT} MEM:0 STATUS:124" > "${prof_file}"
-            else
-                echo "${infile}: RUNTIME_ERROR"
-                echo "RUNTIME_ERROR" > "$outfile"
-                # Manually write stats for Runtime Error case
-                echo "TIME:0 MEM:0 STATUS:${exit_code}" > "${prof_file}"
-            fi
+        # Update the output file for special failure cases
+        if [ $exit_code -eq 124 ]; then
+            echo "TIMEOUT" > "$outfile"
+        elif [ $exit_code -ne 0 ]; then
+            echo "RUNTIME_ERROR" > "$outfile"
+        fi
+
+        if [ $exit_code -ne 0 ] && [ $RUN_FULL_SUITE = "False" ]; then
+            exit 0
         fi
     done
     exit 0

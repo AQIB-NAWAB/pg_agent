@@ -21,7 +21,7 @@ Write a C++ program that generates a focused set of test cases specifically targ
 **Test Case Generation Strategy:**
 - Create a "./test_cases" directory if it doesn't exist
 - Your program must generate 5-10 highly focused test case files in the "./test_cases" directory:
-  - Name format: `./test_cases/edge_1.in`, `./test_cases/edge_2.in`, etc.
+  - Name format: `./test_cases/test_edge_1.in`, `./test_cases/test_edge_2.in`, etc.
 - Each test case should target a specific edge condition or combination of conditions:
   - Minimum/maximum values for all parameters
   - Values just inside/outside valid ranges

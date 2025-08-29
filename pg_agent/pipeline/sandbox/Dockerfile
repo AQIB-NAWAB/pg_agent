@@ -1,6 +1,6 @@
 
 # Use a standard GCC image which has all the build tools we need.
-FROM gcc:11.2.0
+FROM gcc:15.2.0
 
 # Install additional dependencies
 RUN apt-get update && apt-get install -y \

@@ -77,6 +77,8 @@ python 01_problem_statement.py [output_dir] [options]
   --topics TOPICS     Create from random/specified topics (comma-separated)
   --idea IDEA        Create from an initial problem concept
   --refine FEEDBACK  Refine existing problem with feedback
+  --setup-only       Only setup the problem directory structure without generating content
+  --examples-only    Only extract examples from the existing problem statement
   --original PATH    Use another problem as inspiration
   --log-level LEVEL  Set logging level (debug/info/warning/error/critical)
   --quiet           Suppress all output except errors

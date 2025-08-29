@@ -16,5 +16,5 @@
     "problem_statement": "problem_statement.md",
     "standard_program": ["standard.cpp"],
     "explanation": "solution.md",
-    "test_case_generator": "test_generator.cpp"
+    "test_case_generator": ""
 }

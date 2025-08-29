@@ -14,11 +14,33 @@ from pg_agent.nodes.problem_definition_nodes import (
     ProblemDefinitionState,
 )
 from pg_agent.utils.logging import setup_logging, get_log_level
-from pg_agent.utils.structure import get_default_problem_dir
+from pg_agent.utils.structure import get_default_problem_dir, get_problem_paths
 from pg_agent.nodes.topic_selector import select_random_topics
 from pg_agent.utils.models import get_llm
 from pg_agent.utils.env import get_available_models, default_model, load_env
 
+
+def build_setup_only_graph() -> StateGraph:
+    """Builds the graph for only setting up the problem directory."""
+    workflow = StateGraph(ProblemDefinitionState)
+    
+    workflow.add_node("setup", setup_problem_directory)
+    
+    workflow.set_entry_point("setup")
+    workflow.add_edge("setup", END)
+    
+    return workflow.compile()
+
+def build_examples_only_graph() -> StateGraph:
+    """Builds the graph for only extracting examples."""
+    workflow = StateGraph(ProblemDefinitionState)
+    
+    workflow.add_node("examples", extract_examples)
+    
+    workflow.set_entry_point("examples")
+    workflow.add_edge("examples", END)
+    
+    return workflow.compile()
 
 def build_refine_graph() -> StateGraph:
     """Builds the graph for refining an existing problem."""
@@ -60,6 +82,8 @@ def main():
     mode_group.add_argument("--topics", help="Create a problem from randomly selected topics or specified comma-separated list")
     mode_group.add_argument("--idea", help="Create a problem from an initial problem idea or concept")
     mode_group.add_argument("--refine", help="Refine an existing problem statement with feedback")
+    mode_group.add_argument("--setup-only", action="store_true", help="Only setup the problem directory structure without generating content")
+    mode_group.add_argument("--examples-only", action="store_true", help="Only extract examples from the existing problem statement")
     parser.add_argument("--model", type=str, choices=get_available_models("problem_statement"), default=default_model("problem_statement"),
                         help=f"Model to use (default: {default_model('problem_statement')})") 
     # Add original problem argument
@@ -87,12 +111,6 @@ def main():
     if not args.output_dir:
         parser.error("No output directory specified and could not read default from settings")
 
-    # If no topics provided and not using idea or refine mode, select random topics
-    if not any([args.topics, args.idea, args.refine]):
-        topics_list = select_random_topics()
-        args.topics = ", ".join(topics_list)
-        logger.info("No topics specified. Using randomly selected topics: '%s'", args.topics)
-
     # Load original problem if specified
     previous_problem = None
     if args.original:
@@ -109,7 +127,7 @@ def main():
     # Prepare initial state with all required fields from ProblemDefinitionState
     initial_state: ProblemDefinitionState = {
         "output_dir": os.path.abspath(args.output_dir),
-        "topics": args.topics,
+        "topics": "",
         "user_prompt": args.idea,
         "human_feedback": args.refine,
         "previous_problem": previous_problem,
@@ -118,8 +136,28 @@ def main():
         "llm": llm
     }
 
-    # Choose the appropriate graph based on whether we're refining
-    graph = build_refine_graph() if args.refine else build_create_graph()
+    # Choose the appropriate graph based on mode
+    if args.setup_only:
+        graph = build_setup_only_graph()
+    elif args.examples_only:
+        # Read existing problem statement for examples extraction
+        problem_paths = get_problem_paths(args.output_dir)
+        try:
+            with open(problem_paths.problem_statement, 'r', encoding='utf-8') as f:
+                initial_state["problem_statement"] = f.read()
+        except Exception as e:
+            parser.error(f"Failed to read problem statement from {problem_paths.problem_statement}: {str(e)}")
+        graph = build_examples_only_graph()
+    elif args.refine:
+        graph = build_refine_graph()
+    else:
+        # If creating a new problem and no topics or idea provided, select random topics
+        if not any([args.topics, args.idea]):
+            topics_list = select_random_topics()
+            args.topics = ", ".join(topics_list)
+            logger.info("No topics specified. Using randomly selected topics: '%s'", args.topics)
+        initial_state["topics"] = args.topics
+        graph = build_create_graph()
     
     try:
         final_state = graph.invoke(initial_state)

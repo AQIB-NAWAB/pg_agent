@@ -83,18 +83,29 @@ def find_test_cases(test_cases_dir: Path, small_test_cases: bool = False) -> Lis
     
     logger.info("Looking for small test cases...")
     small_test_pairs = find_test_cases_by_pattern(test_cases_dir, "test_[0-9]*.in")
+    small_test_pairs_2 = find_test_cases_by_pattern(test_cases_dir, "test_small_[0-9]*.in")
+    small_test_pairs.extend(small_test_pairs_2)
+
     all_pairs.extend(small_test_pairs)
-   
+
     numbered_pairs = []
     edge_pairs = []
     if not small_test_cases:
+        logger.info("Looking for medium test cases...")
+        medium_test_pairs = find_test_cases_by_pattern(test_cases_dir, "test_medium_[0-9]*.in")
+        all_pairs.extend(medium_test_pairs)
+
+        logger.info("Looking for large test cases...")
+        large_test_pairs = find_test_cases_by_pattern(test_cases_dir, "test_large_[0-9]*.in")
+        all_pairs.extend(large_test_pairs)
+
+        logger.info("Looking for edge test cases...")
+        edge_pairs = find_test_cases_by_pattern(test_cases_dir, "test_edge_[0-9]*.in")
+        all_pairs.extend(edge_pairs)
+
         logger.info("Looking for numbered test cases...")
         numbered_pairs = find_test_cases_by_pattern(test_cases_dir, "[0-9]*.in")
         all_pairs.extend(numbered_pairs)
-        
-        logger.info("Looking for edge test cases...")
-        edge_pairs = find_test_cases_by_pattern(test_cases_dir, "test_edge_*.in")
-        all_pairs.extend(edge_pairs)
         
     # Add all tests in order
     for in_file, out_file in all_pairs:
@@ -104,8 +115,8 @@ def find_test_cases(test_cases_dir: Path, small_test_cases: bool = False) -> Lis
             "name": in_file.name
         })
     
-    logger.info("Found %d example(s), %d small test(s), %d numbered test(s), and %d edge test(s)", 
-                len(example_pairs), len(small_test_pairs), len(numbered_pairs), len(edge_pairs))
+    logger.info("Found %d example(s), %d small test(s), %d medium test(s), %d large test(s), %d numbered test(s), and %d edge test(s)", 
+                len(example_pairs), len(small_test_pairs), len(medium_test_pairs), len(large_test_pairs), len(numbered_pairs), len(edge_pairs))
     
     return test_cases
 
@@ -134,15 +145,15 @@ def find_orphaned_test_inputs(test_cases_dir: Path) -> List[str]:
         
     orphaned_inputs = []
     
-    # First collect orphaned example test cases
-    logger.info("Looking for orphaned example test cases...")
+    # First collect orphaned test cases
+    logger.info("Looking for orphaned test cases...")
     orphaned_inputs.extend(find_orphaned_test_cases_by_pattern(test_cases_dir, "example_*.in"))
-            
-    # Then collect all orphaned numbered test cases (both test_N.in and N.in patterns)
-    logger.info("Looking for orphaned numbered test cases...")
     orphaned_inputs.extend(find_orphaned_test_cases_by_pattern(test_cases_dir, "test_[0-9]*.in"))
+    orphaned_inputs.extend(find_orphaned_test_cases_by_pattern(test_cases_dir, "test_small_[0-9]*.in"))
+    orphaned_inputs.extend(find_orphaned_test_cases_by_pattern(test_cases_dir, "test_medium_[0-9]*.in"))
+    orphaned_inputs.extend(find_orphaned_test_cases_by_pattern(test_cases_dir, "test_large_[0-9]*.in"))
+    orphaned_inputs.extend(find_orphaned_test_cases_by_pattern(test_cases_dir, "test_edge_[0-9]*.in"))
     orphaned_inputs.extend(find_orphaned_test_cases_by_pattern(test_cases_dir, "[0-9]*.in"))
-    orphaned_inputs.extend(find_orphaned_test_cases_by_pattern(test_cases_dir, "test_edge_*.in"))
     
     logger.info("Found %d orphaned test cases", len(orphaned_inputs))
     return orphaned_inputs

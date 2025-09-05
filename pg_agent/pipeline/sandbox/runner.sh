@@ -43,8 +43,11 @@ elif [ "$MODE" = "execute_suite" ]; then
     # 4. test_edge_*.in
     for infile in $(find "./" -name "example_*.in" | sort -V) \
                   $(find "./" -name "test_[0-9]*.in" | sort -V) \
-                  $(find "./" -name "[0-9]*.in" | sort -V) \
-                  $(find "./" -name "test_edge_*.in" | sort -V); do
+                  $(find "./" -name "test_small_[0-9]*.in" | sort -V) \
+                  $(find "./" -name "test_medium_[0-9]*.in" | sort -V) \
+                  $(find "./" -name "test_large_[0-9]*.in" | sort -V) \
+                  $(find "./" -name "test_edge_[0-9]*.in" | sort -V) \
+                  $(find "./" -name "[0-9]*.in" | sort -V) ; do
         echo "INFILE: ${infile}"
         casenum=$(basename "$infile" .in)
         outfile="${casenum}.out"

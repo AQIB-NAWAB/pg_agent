@@ -76,6 +76,12 @@ def find_test_cases(test_cases_dir: Path, small_test_cases: bool = False) -> Lis
         
     test_cases = []
     all_pairs = []
+    example_pairs = []
+    small_test_pairs = []
+    medium_test_pairs = []
+    large_test_pairs = []
+    numbered_pairs = []
+    edge_pairs = []
     
     logger.info("Looking for example test cases...")
     example_pairs = find_test_cases_by_pattern(test_cases_dir, "example_*.in")

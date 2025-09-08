@@ -245,7 +245,6 @@ class AsyncLLMClient:
         except Exception as e:
             if callback:
                 callback(context, {"stage": "Error", "lengths": current_lengths})
-            raise RuntimeError(f"API error: {getattr(e, 'status_code', 'N/A')} - {str(e)}")
 
 
 class AsyncOpenAIClient(AsyncLLMClient):
@@ -369,11 +368,10 @@ class AsyncAlibabaClient(AsyncLLMClient):
     def get_reasoning_key(self):
         """Get the key used for reasoning/thinking content."""
         return "thinking_content" if not self.is_fireworks else "reasoning_content"
-
-    async def process_chunk(self, chunk, response_f, reasoning_f, run_id, current_lengths=None):
+    async def process_chunk(self, chunk, response_f, reasoning_f, current_lengths: dict):
         """Override to handle different reasoning content key names."""
         if not chunk.choices:
-            return await super().process_chunk(chunk, response_f, reasoning_f, run_id, current_lengths)
+            return await super().process_chunk(chunk, response_f, reasoning_f, current_lengths)
             
         # Replace reasoning_content with the appropriate key for this provider
         delta = chunk.choices[0].delta
@@ -382,7 +380,7 @@ class AsyncAlibabaClient(AsyncLLMClient):
             # Temporarily map to reasoning_content for base class handling
             setattr(delta, "reasoning_content", getattr(delta, reasoning_key))
             
-        return await super().process_chunk(chunk, response_f, reasoning_f, run_id, current_lengths)
+        return await super().process_chunk(chunk, response_f, reasoning_f, current_lengths)
 
 
 class AsyncTencentClient(AsyncLLMClient):
@@ -436,7 +434,7 @@ class AsyncGeminiClient(AsyncLLMClient):
             **params
         )
 
-    async def ainvoke(self, messages, response_file, reasoning_file, run_id, stream=True, debug=False):
+    async def ainvoke(self, messages, response_file, reasoning_file, stream=True, context=None, callback=None, debug=False):
         chat_messages = [{"role": m.type, "content": m.content} for m in messages]
 
         if not stream:
@@ -446,11 +444,13 @@ class AsyncGeminiClient(AsyncLLMClient):
             async with aiofiles.open(response_file, "w", encoding="utf-8") as f:
                 await f.write(response.content)
 
-            await self.update_progress(run_id, "Completed", reasoning_len, len(response.content))
+            if callback:
+                callback(context, {"stage": "Completed", "lengths": {"reasoning": reasoning_len, "response": len(response.content)}})
             return response
 
         # Initialize progress at start
-        await self.update_progress(run_id, "Starting", 0, 0)
+        if callback:
+            callback(context, {"stage": "Starting", "lengths": {"reasoning": 0, "response": 0}})
 
         reasoning_len = 0
         response_len = 0
@@ -463,9 +463,11 @@ class AsyncGeminiClient(AsyncLLMClient):
                 await response_f.flush()
 
                 response_len += len(chunk_content)
-                await self.update_progress(run_id, "Responding", reasoning_len, response_len)
+                if callback:
+                    callback(context, {"stage": "Responding", "lengths": {"reasoning": reasoning_len, "response": response_len}})
 
-        await self.update_progress(run_id, "Completed", reasoning_len, response_len)
+        if callback:
+            callback(context, {"stage": "Completed", "lengths": {"reasoning": reasoning_len, "response": response_len}})
 
         return type('Message', (), {'content': await self._read_file(response_file)})()
 

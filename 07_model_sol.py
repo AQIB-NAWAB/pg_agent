@@ -2,6 +2,7 @@ import sys
 import re
 import logging
 import asyncio
+import threading
 import traceback
 import argparse
 from pathlib import Path
@@ -12,7 +13,59 @@ from pg_agent.utils.logging import setup_logging, get_log_level
 from pg_agent.utils.structure import get_default_problem_dir, get_problem_paths
 from pg_agent.utils.parsing import extract_cpp_code
 
-async def generate_one(llm, prompt, index, problem_paths, model_name, logger):
+class ProgressTracker:
+    def __init__(self, num_tasks):
+        self._progress = {}
+        for i in range(num_tasks):
+            self._progress[i] = {
+                'model_name': "N/A",
+                'stage': "Not started",
+                'run_id': -1,
+                'reasoning_len': 0,
+                'response_len': 0
+            }
+        self._progress_lock = threading.Lock()
+        self._progress_header_printed = False
+        self._num_tasks = num_tasks
+
+    def update_progress(self, context, progress):
+        task_id = context["task_id"]
+        run_id = context["run_id"]
+        model_name = context["model_name"]
+        stage = progress["stage"]
+        reasoning_len = progress["lengths"]["reasoning"]
+        response_len = progress["lengths"]["response"]
+
+        with self._progress_lock:
+            self._progress[task_id] = {
+                'model_name': model_name,
+                'stage': stage,
+                'run_id': run_id,
+                'reasoning_len': reasoning_len,
+                'response_len': response_len
+            }
+            
+            # Print header only once
+            if not self._progress_header_printed:
+                print("Generation Progress:")
+                self._progress_header_printed = True
+            
+            # Save cursor position and move back to progress section
+            print("\0337", end="")  # Save cursor
+            print(f"\033[{self._num_tasks + 2}A", end="")  # Move up to progress section (+2 for header and blank line)
+            
+            # Print progress
+            print("\033[K")  # Clear header line
+            print("Generation Progress:")
+            for task_id in sorted(self._progress.keys()):
+                p = self._progress[task_id]
+                print(f"\033[K{p['model_name']:<10}: run {p['run_id']:2d}: | {p['stage']:<10} | Reasoning: {p['reasoning_len']:5d} | Response: {p['response_len']:5d} chars")
+            
+            # Restore cursor position
+            print("\0338", end="", flush=True)  # Restore cursor
+
+
+async def generate_one(task_id, llm, prompt, index, problem_paths, model_name, logger, progress_tracker):
     messages = [HumanMessage(content=prompt)]
     try:
         # Get paths for code, prompt and raw response
@@ -24,7 +77,8 @@ async def generate_one(llm, prompt, index, problem_paths, model_name, logger):
             response_file=response_path,
             reasoning_file=reasoning_path,
             stream=True,
-            run_id=index  # Pass the run index for progress tracking
+            context={"task_id": task_id, "run_id": index, "model_name": model_name},
+            callback=progress_tracker.update_progress
         )
         cpp_code = extract_cpp_code(response.content)
         
@@ -41,6 +95,7 @@ async def generate_one(llm, prompt, index, problem_paths, model_name, logger):
         
     except Exception as e:
         logger.error(f"❌ Error generating solution {index}: {e}")
+        raise e
 
 
 async def generate_code_async(llm, problem_text, num, problem_paths, model_name, logger):
@@ -102,12 +157,13 @@ async def generate_code_async(llm, problem_text, num, problem_paths, model_name,
             print(f"  {k}: {v}")
     
     # Add extra newlines based on number of runs to prevent progress display from overwriting paths
-    num_runs = len(indexes_to_use)
-    print(f"\nStarting generation...{chr(10) * num_runs}\n")  # One line per run plus extra for header
+    num_tasks = len(indexes_to_use)
+    print(f"\nStarting generation...{chr(10) * num_tasks}\n")  # One line per run plus extra for header
     
+    progress_tracker = ProgressTracker(num_tasks)
     tasks = [
-        generate_one(llm, prompt, i, problem_paths, model_name, logger)
-        for i in indexes_to_use
+        generate_one(task_id, llm, prompt, i, problem_paths, model_name, logger, progress_tracker)
+        for task_id, i in enumerate(indexes_to_use)
     ]
     await asyncio.gather(*tasks)
 

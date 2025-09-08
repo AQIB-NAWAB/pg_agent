@@ -100,39 +100,6 @@ class AsyncLLMClient:
             http_client=httpx.AsyncClient(timeout=httpx.Timeout(timeout)),
         )
 
-    # Shared progress state across instances
-    _progress = {}
-    _progress_lock = asyncio.Lock()
-    _progress_header_printed = False
-
-    @classmethod
-    async def update_progress(cls, run_id, stage, reasoning_len, response_len):
-        async with cls._progress_lock:
-            cls._progress[run_id] = {
-                'stage': stage,
-                'reasoning_len': reasoning_len,
-                'response_len': response_len
-            }
-            
-            # Print header only once
-            if not cls._progress_header_printed:
-                print("Generation Progress:")
-                cls._progress_header_printed = True
-            
-            # Save cursor position and move back to progress section
-            print("\0337", end="")  # Save cursor
-            print(f"\033[{len(cls._progress) + 2}A", end="")  # Move up to progress section (+2 for header and blank line)
-            
-            # Print progress
-            print("\033[K")  # Clear header line
-            print("Generation Progress:")
-            for rid in sorted(cls._progress.keys()):
-                p = cls._progress[rid]
-                print(f"\033[KRun {rid:2d}: {p['stage']:<10} | Reasoning: {p['reasoning_len']:5d} | Response: {p['response_len']:5d} chars")
-            
-            # Restore cursor position
-            print("\0338", end="", flush=True)  # Restore cursor
-
     async def get_completion_params(self, messages, stream=True):
         """Get provider-specific completion parameters. Override in subclasses."""
         chat_messages = [{"role": "user", "content": m.content} for m in messages]
@@ -159,16 +126,13 @@ class AsyncLLMClient:
                 **params
             )
 
-    async def process_chunk(self, chunk, response_f, reasoning_f, run_id, current_lengths=None):
+    async def process_chunk(self, chunk, response_f, reasoning_f, current_lengths: dict):
         """Process a chunk from the stream with common handling."""
         if not chunk.choices:
             if hasattr(chunk, 'usage'):
                 self.logger.debug("Usage: %s", chunk.usage)
             return None
 
-        if current_lengths is None:
-            current_lengths = {'reasoning': 0, 'response': 0}
-            
         delta = chunk.choices[0].delta
         result = {
             'full_content': '',
@@ -182,8 +146,6 @@ class AsyncLLMClient:
                 await reasoning_f.flush()
             result['reasoning_content'] = delta.reasoning_content
             current_lengths['reasoning'] += len(delta.reasoning_content)
-            if run_id is not None:
-                await self.update_progress(run_id, "Reasoning", current_lengths['reasoning'], current_lengths['response'])
         
         # Handle regular content
         if hasattr(delta, "content") and delta.content:
@@ -192,15 +154,12 @@ class AsyncLLMClient:
                 await response_f.flush()
             result['full_content'] = delta.content
             current_lengths['response'] += len(delta.content)
-            if run_id is not None:
-                await self.update_progress(run_id, "Responding", current_lengths['reasoning'], current_lengths['response'])
         
         return result
 
-    async def ainvoke(self, messages, response_file, reasoning_file, run_id, stream=True, debug=False):
+    async def ainvoke(self, messages, response_file, reasoning_file, stream=True, context=None, callback=None, debug=False):
         """Generic implementation of async invocation with progress tracking."""
 
-        # Initialize tracking variables
         full_content = ""
         reasoning_content = ""
         current_lengths = {'reasoning': 0, 'response': 0}
@@ -210,10 +169,10 @@ class AsyncLLMClient:
             self.logger.debug("🤖 Invoking %s with params: %s", self.model, params)
             
             if stream:
-                await self.update_progress(run_id, "Starting", 0, 0)
+                if callback:
+                    callback(context, {"stage": "Starting", "lengths": current_lengths})
                 stream_response = await self.create_completion(params)
                 
-                # Process the streaming response
                 response_f = None
                 reasoning_f = None
                 debug_f = None
@@ -228,7 +187,6 @@ class AsyncLLMClient:
                         debug_file = str(response_file).replace('.md', '.raw_chunks.txt')
                         debug_f = await aiofiles.open(debug_file, 'w', encoding='utf-8')
                         await debug_f.write(f"=== Raw Chunks Debug for {self.model} ===\n")
-                        await debug_f.write(f"Run ID: {run_id}\n")
                         await debug_f.write(f"Response file: {response_file}\n")
                         await debug_f.write(f"Reasoning file: {reasoning_file}\n")
                         await debug_f.write("=" * 50 + "\n\n")
@@ -248,7 +206,9 @@ class AsyncLLMClient:
                             await debug_f.write("\n")
                             await debug_f.flush()
                         
-                        result = await self.process_chunk(chunk, response_f, reasoning_f, run_id, current_lengths)
+                        result = await self.process_chunk(chunk, response_f, reasoning_f, current_lengths)
+                        if callback:
+                            callback(context, {"stage": "Responding", "lengths": current_lengths})
                         if result:
                             # Accumulate content for final return
                             if result.get('reasoning_content'):
@@ -261,7 +221,6 @@ class AsyncLLMClient:
                             reasoning_content = accumulated_reasoning
                 
                 finally:
-                    # Close files
                     await response_f.flush()
                     await response_f.close()
                     await reasoning_f.flush()
@@ -273,10 +232,9 @@ class AsyncLLMClient:
                         await debug_f.flush()
                         await debug_f.close()
                     
-                # Update final progress with accumulated lengths
-                await self.update_progress(run_id, "Completed", current_lengths['reasoning'], current_lengths['response'])
+                if callback:
+                    callback(context, {"stage": "Completed", "lengths": current_lengths})
                 
-                # Return a message-like object with both content types
                 return type('Message', (), {
                     'content': full_content,
                     'reasoning_content': reasoning_content
@@ -285,8 +243,8 @@ class AsyncLLMClient:
                 response = await self.create_completion(params)
                 return response.choices[0].message
         except Exception as e:
-            # Keep the current lengths even in case of error
-            await self.update_progress(run_id, "Error", current_lengths['reasoning'], current_lengths['response'])
+            if callback:
+                callback(context, {"stage": "Error", "lengths": current_lengths})
             raise RuntimeError(f"API error: {getattr(e, 'status_code', 'N/A')} - {str(e)}")
 
 

@@ -43,7 +43,9 @@
             "qwen3-235b-a22b-thinking-2507",
             "doubao-seed-1-6-thinking-250715",
             "hunyuan-t1-20250711",
+            "hunyuan-t1-20250822",
             "hunyuan-turbos-20250604",
+            "hunyuan-turbos-20250716",
             "o3",
             "claude-opus-4-20250514",
             "claude-opus-4-1-20250805",
@@ -119,7 +121,17 @@
                         "max_tokens": 64000
                     }
                 },
+                "hunyuan-t1-20250822": {
+                    "parameters": {
+                        "max_tokens": 64000
+                    }
+                },
                 "hunyuan-turbos-20250604": {
+                    "parameters": {
+                        "max_tokens": 16000
+                    }
+                },
+                "hunyuan-turbos-20250716": {
                     "parameters": {
                         "max_tokens": 16000
                     }

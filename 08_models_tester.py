@@ -99,7 +99,7 @@ def generate_reports(report_data: dict, report_dir: Path, settings: dict):
                 f.write(f"**Overall Status:** ❌ FAILURE\n")
                 
             f.write(f"**Score:** {summary.get('passed', 0)} / {summary.get('total_available', 0)} ({summary.get('total_run', 0)} tests executed)\n\n")
-            f.write(f"**Compilation Command:** `g++ -std=c++14 -O2 -w -o executable solution.cpp`\n\n")
+            f.write(f"**Compilation Command:** `g++ -std=c++20 -O2 -w -o executable solution.cpp`\n\n")
 
             f.write("## Test Case Results\n\n")
             f.write("| Test Case | Status | Time (s) | Memory (MB) |\n")
@@ -235,7 +235,7 @@ def main():
     parser.add_argument("--solution", type=str, help="Path to a single specific solution file to test.")
     parser.add_argument("--solutions-dir", type=str, help="Path to a directory of solutions to test.")
     parser.add_argument("--time-limit", type=float, default=5.0, help="Time limit in seconds for each test case.")
-    parser.add_argument("--memory", type=str, default="512m", help="Memory limit for Docker (e.g., '256m').")
+    parser.add_argument("--memory", type=int, default=512, help="Memory limit for Docker (e.g., '256m').")
     parser.add_argument("--cpus", type=str, default="1.5", help="CPU limit for Docker (e.g., '1.5').")
     
     args = parser.parse_args()
@@ -249,16 +249,28 @@ def main():
 
     problem_dir = Path(args.problem_dir)
     paths = get_problem_paths(problem_dir)
-    problem_config_metadata_path = problem_dir / "requirements.json"
     problem_metadata = {}
 
-    # check if probelm directory exists and problem_config_metadata exists and only if they do, read the metadata (true condition)
-    if problem_dir.is_dir() and problem_config_metadata_path.exists():
-        try:
-            problem_metadata = json.loads(problem_config_metadata_path.read_text(encoding="utf-8"))
-            logger.info(f"Loaded problem metadata from {problem_config_metadata_path}")
-        except json.JSONDecodeError:
-            logger.warning(f"Warning: Invalid JSON in {problem_config_metadata_path}. Proceeding without metadata.")
+    # check if problem directory exists and search for metadata files
+    if problem_dir.is_dir():
+        # Search for metadata files in order of preference
+        metadata_files = ["requirements.json", "metadata.json"]
+        problem_config_metadata_path = None
+        
+        for metadata_file in metadata_files:
+            candidate_path = problem_dir / metadata_file
+            if candidate_path.exists():
+                problem_config_metadata_path = candidate_path
+                break
+        
+        if problem_config_metadata_path:
+            try:
+                problem_metadata = json.loads(problem_config_metadata_path.read_text(encoding="utf-8"))
+                logger.info(f"Loaded problem metadata from {problem_config_metadata_path}")
+            except json.JSONDecodeError:
+                logger.warning(f"Warning: Invalid JSON in {problem_config_metadata_path}. Proceeding without metadata.")
+        else:
+            logger.warning(f"Warning: No metadata file found in {problem_dir}. Looked for: {', '.join(metadata_files)}. Proceeding without metadata.")
             
     # --- Generation Phase ---
     if args.generate:

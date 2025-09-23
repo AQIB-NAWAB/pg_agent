@@ -51,64 +51,51 @@ def get_async_llm(model_config):
     common_params = {
         "model": model_config["model"],
         "api_key": model_config["api_key"],
-        "max_tokens": model_config["parameters"].get("max_tokens", None)
     }
     common_params = {k: v for k, v in common_params.items() if v is not None}
-    
+    parameters = model_config["parameters"]
+
     if model_config["provider"] == "fireworks" or model_config["provider"] == "dashscope":
-        return AsyncAlibabaClient(
-            **common_params,
-            enable_thinking=model_config["parameters"].get("enable_thinking", False)
-        )
+        return AsyncAlibabaClient(**common_params, parameters=parameters)
     elif model_config["provider"] == "bytedance":
-        return AsyncBytedanceClient(**common_params)
+        return AsyncBytedanceClient(**common_params, parameters=parameters)
     elif model_config["provider"] == "tencent":
-        return AsyncTencentClient(**common_params)
+        return AsyncTencentClient(**common_params, parameters=parameters)
     elif model_config["provider"] == "openai":
-        return AsyncOpenAIClient(**common_params)
+        return AsyncOpenAIClient(**common_params, parameters=parameters)
     elif model_config["provider"] == "anthropic":
-        return AsyncAnthropicClient(**common_params)
+        return AsyncAnthropicClient(**common_params, parameters=parameters)
     elif model_config["provider"] == "google":
-        return AsyncGeminiClient(**common_params)
+        return AsyncGeminiClient(**common_params, parameters=parameters)
     else:
         raise ValueError(f"Unsupported model: {model_config['model']}")
 
 
 class AsyncLLMClient:
-    def __init__(
-        self,
-        model: str,
-        api_key: str,
-        env_key: str,
-        base_url: str,
-        temperature: float = None,
-        max_tokens: int = None,
-        timeout: float = 600.0,
-    ):
+    def __init__(self, model: str, api_key: str, base_url: str, parameters: dict = {}, timeout: float = 600.0):
         self.model = model
-        self.temperature = temperature
-        self.max_tokens = max_tokens
+        self.parameters = parameters
         self.logger = logging.getLogger(__name__)
 
-        self.api_key = api_key or os.getenv(env_key)
+        self.api_key = api_key
         if not self.api_key:
-            raise ValueError(f"{env_key} not set.")
+            raise ValueError(f"api_key not set.")
 
-        self.client = AsyncOpenAI(
-            api_key=self.api_key,
-            base_url=base_url,
-            http_client=httpx.AsyncClient(timeout=httpx.Timeout(timeout)),
-        )
+        if base_url:
+            self.client = AsyncOpenAI(
+                api_key=self.api_key,
+                base_url=base_url,
+                http_client=httpx.AsyncClient(timeout=httpx.Timeout(timeout)),
+            )
 
     async def get_completion_params(self, messages, stream=True):
         """Get provider-specific completion parameters. Override in subclasses."""
         chat_messages = [{"role": "user", "content": m.content} for m in messages]
         params = {
             "model": self.model,
-            "max_tokens": self.max_tokens,
-            "temperature": self.temperature,
             "stream": stream,
-            "messages": chat_messages
+            "messages": chat_messages,
+            **self.parameters
         }
         return {k: v for k, v in params.items() if v is not None}
 
@@ -171,6 +158,7 @@ class AsyncLLMClient:
             if stream:
                 if callback:
                     callback(context, {"stage": "Starting", "lengths": current_lengths})
+
                 stream_response = await self.create_completion(params)
                 
                 response_f = None
@@ -245,88 +233,30 @@ class AsyncLLMClient:
         except Exception as e:
             if callback:
                 callback(context, {"stage": "Error", "lengths": current_lengths})
+            raise e
 
 
 class AsyncOpenAIClient(AsyncLLMClient):
-    def __init__(
-        self,
-        model: str,
-        api_key: str,
-        temperature: float = None,
-        max_tokens: int = None,
-        timeout: float = 600.0,
-    ):
-        super().__init__(
-            model=model,
-            api_key=api_key,
-            env_key="OPENAI_API_KEY",
-            base_url="https://api.openai.com/v1",
-
-            temperature=temperature,
-            max_tokens=max_tokens,
-            timeout=timeout,
-        )
+    def __init__(self, model: str, api_key: str, parameters: dict = {}, timeout: float = 600.0):
+        super().__init__(model, api_key, parameters, "https://api.openai.com/v1", timeout)
 
 
 class AsyncAnthropicClient(AsyncLLMClient):
-    def __init__(
-        self,
-        model: str,
-        api_key: str,
-        temperature: float = None,
-        max_tokens: int = None,
-        timeout: float = 600.0,
-    ):
-        super().__init__(
-            model=model,
-            api_key=api_key,
-            env_key="ANTHROPIC_API_KEY",
-            base_url="https://api.anthropic.com/v1",
+    def __init__(self, model: str, api_key: str, parameters: dict = {}, timeout: float = 600.0):
+        super().__init__(model, api_key, "https://api.anthropic.com/v1", parameters, timeout)
 
-            temperature=temperature,
-            max_tokens=max_tokens,
-            timeout=timeout,
-        )
 
 class AsyncBytedanceClient(AsyncLLMClient):
-    def __init__(
-        self,
-        model: str,
-        api_key: str,
-        max_tokens: int = None,
-        temperature: float = None
-    ):
-        super().__init__(
-            model=model,
-            api_key=api_key,
-            env_key="BYTEDANCE_API_KEY",  # Not used since we pass api_key directly
-            base_url="",  # Not used for Ark client
-            temperature=temperature,
-            max_tokens=max_tokens,
-            timeout=600.0,
-        )
+    def __init__(self, model: str, api_key: str, parameters: dict = {}):
+        super().__init__(model, api_key, "", parameters, 600.0)
         self.client = AsyncArk(api_key=api_key)
 
-    async def create_completion(self, params):
-        """Override to use AsyncArk client."""
-        messages = params.pop("messages")
-        return await self.client.chat.completions.create(
-            messages=messages,
-            **params
-        )
+    def is_async_client(self):
+        return True
 
 
 class AsyncAlibabaClient(AsyncLLMClient):
-    def __init__(
-        self,
-        model: str,
-        api_key: str,
-        max_tokens: int = None,
-        temperature: float = None,
-        enable_thinking: bool = False,
-        thinking_budget: int = 38912,
-        timeout: float = 600.0
-    ):
+    def __init__(self, model: str, api_key: str, parameters: dict = {}, timeout: float = 600.0):
         # Determine base URL based on model type
         self.is_fireworks = model.startswith("accounts/fireworks/models/")
         base_url = (
@@ -334,40 +264,16 @@ class AsyncAlibabaClient(AsyncLLMClient):
             if self.is_fireworks
             else "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
         )
-
-        super().__init__(
-            model=model,
-            api_key=api_key,
-            env_key="ALIBABA_API_KEY",  # Not used since we pass api_key directly
-            base_url=base_url,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            timeout=timeout,
-        )
+        super().__init__(model, api_key, base_url, parameters, timeout)
         
-        self.enable_thinking = enable_thinking
-        self.thinking_budget = thinking_budget
-
-    async def get_completion_params(self, messages, stream=True):
-        """Get provider-specific completion parameters."""
-        params = await super().get_completion_params(messages, stream)
-        
-        # Add thinking mode parameters for Alibaba models
-        if not self.is_fireworks and self.enable_thinking:
-            params["extra_body"] = {
-                "enable_thinking": True,
-                "thinking_budget": self.thinking_budget
-            }
-        
-        return params
-
     def is_async_client(self):
         """Both Fireworks and Alibaba clients are async."""
         return True
 
     def get_reasoning_key(self):
         """Get the key used for reasoning/thinking content."""
-        return "thinking_content" if not self.is_fireworks else "reasoning_content"
+        return "reasoning_content" if self.is_fireworks else "thinking_content"
+
     async def process_chunk(self, chunk, response_f, reasoning_f, current_lengths: dict):
         """Override to handle different reasoning content key names."""
         if not chunk.choices:
@@ -384,49 +290,19 @@ class AsyncAlibabaClient(AsyncLLMClient):
 
 
 class AsyncTencentClient(AsyncLLMClient):
-    def __init__(
-        self,
-        model: str,
-        api_key: str,
-        max_tokens: int = None,
-        temperature: float = None
-    ):
-        super().__init__(
-            model=model,
-            api_key=api_key,
-            env_key="TENCENT_API_KEY",  # Not used since we pass api_key directly
-            base_url="https://api.hunyuan.cloud.tencent.com/v1",
-            temperature=temperature,
-            max_tokens=max_tokens,
-            timeout=600.0,
-        )
-        # Use AsyncOpenAI instead of OpenAI for consistent async behavior
-        self.client = AsyncOpenAI(
-            api_key=self.api_key,
-            base_url="https://api.hunyuan.cloud.tencent.com/v1",
-            http_client=httpx.AsyncClient(timeout=httpx.Timeout(600.0))
-        )
+    def __init__(self, model: str, api_key: str, parameters: dict = {}):
+        super().__init__(model, api_key, "https://api.hunyuan.cloud.tencent.com/v1", parameters, 600.0)
 
 
 class AsyncGeminiClient(AsyncLLMClient):
-    def __init__(
-        self,
-        model: str,
-        api_key: str,
-        max_tokens: Optional[int] = None,
-        temperature: Optional[float] = None,
-        **kwargs,
-    ):
+    def __init__(self, model: str, api_key: str, parameters: dict = {}):
         self.logger = logging.getLogger(__name__)
         self.model = model
         self.api_key = api_key
-        self.max_tokens = max_tokens
-        self.temperature = temperature
 
         params = {
             "model": model,
-            "temperature": temperature,
-            "max_output_tokens": max_tokens,
+            **parameters
         }
         params = {k: v for k, v in params.items() if v is not None}
         self.client = ChatGoogleGenerativeAI(

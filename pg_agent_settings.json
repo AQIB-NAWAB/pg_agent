@@ -44,6 +44,7 @@
             "doubao-seed-1-6-thinking-250715",
             "hunyuan-t1-latest",
             "hunyuan-turbos-latest",
+            "hunyuan-t1-dev-20250822",
             "o3",
             "claude-opus-4-20250514",
             "claude-opus-4-1-20250805",
@@ -101,7 +102,12 @@
                     "model": "qwen3-coder-480b-a35b-instruct"
                 },
                 "qwen3-235b-a22b-thinking-2507": {
-                    "model": "qwen3-235b-a22b-thinking-2507"
+                    "model": "qwen3-235b-a22b-thinking-2507",
+                    "parameters": {
+                        "extra_body": {
+                            "thinking_budget": 38912
+                        }
+                    }
                 }
             }
         },
@@ -122,6 +128,21 @@
                 "hunyuan-turbos-latest": {
                     "parameters": {
                         "max_tokens": 16000
+                    }
+                },
+                "hunyuan-t1-dev-20250822": {
+                    "parameters": {
+                        "max_tokens": 64000,
+                        "temperature": 0.7,
+                        "top_p": 0.8,
+                        "extra_body": {
+                            "top_k": 20,
+                            "beam_size": 1,
+                            "repetition_penalty": 1.05,
+                            "repetition_ngram": 16,
+                            "repetition_patiences": 16
+                        }
+
                     }
                 }
             }

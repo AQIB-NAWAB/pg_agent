@@ -94,35 +94,68 @@ class ProgressTracker:
 
 async def generate_one(task_id, llm, prompt, index, problem_paths, model_name, logger, progress_tracker):
     messages = [HumanMessage(content=prompt)]
-    try:
-        # Get paths for code, prompt and raw response
-        code_path, prompt_path, response_path, reasoning_path = problem_paths.get_run_paths(model_name, index)
-        
-        # Stream response directly to separate files
-        response = await llm.ainvoke(
-            messages,
-            response_file=response_path,
-            reasoning_file=reasoning_path,
-            stream=True,
-            context={"task_id": task_id, "run_id": index, "model_name": model_name},
-            callback=progress_tracker.update_progress
-        )
-        cpp_code = extract_cpp_code(response.content)
-        
-        # Save the code to runs/
-        code_path.write_text(cpp_code, encoding="utf-8")
-        logger.debug("✅ Saved code to: %s", code_path)  # Changed to debug to avoid cluttering progress display
-        
-        # Save the reasoning to automation/runs/
-        if hasattr(response, 'reasoning_content'):
-            reasoning_path.write_text(response.reasoning_content, encoding="utf-8")
-            logger.debug("✅ Saved reasoning to: %s", reasoning_path)  # Changed to debug
+    
+    # Try up to 3 attempts to get valid cpp code
+    for attempt in range(3):
+        try:
+            # Get paths for code, prompt and raw response
+            code_path, prompt_path, response_path, reasoning_path = problem_paths.get_run_paths(model_name, index)
+            
+            # Stream response directly to separate files
+            response = await llm.ainvoke(
+                messages,
+                response_file=response_path,
+                reasoning_file=reasoning_path,
+                stream=True,
+                context={"task_id": task_id, "run_id": index, "model_name": model_name},
+                callback=progress_tracker.update_progress
+            )
+            
+            # Try to extract cpp code from response
+            cpp_code = extract_cpp_code(response.content)
+            
+            # If cpp_code is empty, try extracting from reasoning file
+            if not cpp_code and reasoning_path.exists():
+                logger.debug(f"Attempt {attempt + 1}: No C++ code found in response, trying reasoning file")
+                try:
+                    reasoning_content = reasoning_path.read_text(encoding="utf-8")
+                    if reasoning_content.strip():
+                        cpp_code = extract_cpp_code(reasoning_content)
+                except Exception as read_error:
+                    logger.debug(f"Could not read reasoning file: {read_error}")
+            
+            # If we still don't have cpp_code and this isn't the last attempt, retry
+            if not cpp_code and attempt < 2:
+                logger.warning(f"Attempt {attempt + 1}: No C++ code found, retrying... ({attempt + 2}/3)")
+                continue
+            
+            # If we still don't have cpp_code after all attempts, log error but save what we have
+            if not cpp_code:
+                logger.error(f"❌ No C++ code found after 3 attempts for solution {index}")
+                cpp_code = "// No C++ code could be extracted from the response"
+            
+            # Save the code to runs/
+            code_path.write_text(cpp_code, encoding="utf-8")
+            logger.info("✅ Saved code to: %s", code_path)
+            
+            # Save the reasoning to automation/runs/
+            if hasattr(response, 'reasoning_content'):
+                reasoning_path.write_text(response.reasoning_content, encoding="utf-8")
+                logger.info("✅ Saved reasoning to: %s", reasoning_path)
 
-        logger.debug("✅ Streamed response to: %s", response_path)  # Changed to debug
-        
-    except Exception as e:
-        logger.error(f"❌ Error generating solution {index}: {e}")
-        raise e
+            logger.info("✅ Streamed response to: %s", response_path)
+            
+            # If we got here with valid cpp_code, break out of retry loop
+            if cpp_code and cpp_code != "// No C++ code could be extracted from the response":
+                break
+                
+        except Exception as e:
+            if attempt < 2:
+                logger.warning(f"Attempt {attempt + 1} failed for solution {index}: {e}, retrying... ({attempt + 2}/3)")
+                continue
+            else:
+                logger.error(f"❌ Error generating solution {index} after 3 attempts: {e}")
+                raise e
 
 
 async def generate_code_async(llm_configs, problem_text, num, problem_paths, logger):
@@ -177,7 +210,9 @@ async def generate_code_async(llm_configs, problem_text, num, problem_paths, log
         # Save prompt for this model
         _, prompt_path, _, _ = problem_paths.get_run_paths(model_name, 0)
         prompt_path.write_text(prompt, encoding="utf-8")
-        logger.debug("✅ Saved prompt to: %s", prompt_path)
+        logger.info("✅ Saved prompt to: %s", prompt_path)
+        logger.info("📋 Model %s will generate %d solutions: run numbers %s", 
+                   model_name, len(indexes_to_use), ", ".join(map(str, indexes_to_use)))
         
         # Store model info for display
         model_info.append({
@@ -270,20 +305,33 @@ def main():
                         help="LLM provider for model (use 'default' to use model's default provider)")
     parser.add_argument("--model", nargs='+', default=[default_model_name],
                         help=f"Choose model(s) to use. Can be a single model or multiple models separated by spaces or commas. Available: {', '.join(available_models)}")
-    parser.add_argument("--enable-thinking", action="store_true",
-                        help="Enable internal thinking mode (Qwen only)")
-    parser.add_argument("--log-level", type=str, default="warning",
+    parser.add_argument("--log-level", type=str, default="debug",
                         choices=['debug', 'info', 'warning', 'error', 'critical'],
-                        help="Set the logging level (default: warning)")
+                        help="Set the logging level (default: debug)")
     parser.add_argument("--quiet", action="store_true",
                         help="Suppress output except errors")
     
     args = parser.parse_args()
     log_level = logging.ERROR if args.quiet else get_log_level(args.log_level)
-    setup_logging(log_level)
-    logger = logging.getLogger(__name__)
-
+    
     problem_dir = Path(args.problem_dir)
+    
+    # Set up automatic log file using problem paths
+    log_file = None
+    if not args.quiet:  # Only log to file if not in quiet mode
+        problem_paths = get_problem_paths(str(problem_dir))
+        script_name = Path(__file__).stem  # Gets "07_model_sol" from "07_model_sol.py"
+        log_file = problem_paths.automation / "logs" / f"{script_name}.log"
+    
+    setup_logging(log_level, str(log_file) if log_file else None, console_logging=False)
+    logger = logging.getLogger(__name__)
+    
+    if log_file:
+        logger.info("="*60)
+        logger.info("🚀 Model Solution Generation Session Started")
+        logger.info("="*60)
+        logger.info("Command line arguments: %s", " ".join(sys.argv[1:]))
+        logger.info("Log file: %s", log_file)
 
     try:
         # Parse model names
@@ -303,17 +351,13 @@ def main():
         llm_configs = []
         for model_name in model_names:
             model_config = load_env(model=model_name, provider=args.provider)
-            use_thinking = args.enable_thinking or "thinking" in model_name.lower()
-            model_config["parameters"]["enable_thinking"] = use_thinking
-
-            # Get LLM instance
             llm = get_async_llm(model_config)
             llm_configs.append((llm, model_name))
-            
-            logger.info("✅ Configured model: %s%s", 
-                       model_name, " (with thinking)" if use_thinking else "")
-    
-        problem_paths = get_problem_paths(str(problem_dir))
+            logger.info("✅ Configured model: %s", model_name)
+        
+        # problem_paths already created above for logging, reuse it
+        if 'problem_paths' not in locals():
+            problem_paths = get_problem_paths(str(problem_dir))
         if not problem_paths.problem_statement.exists():
             logger.error("❌ Problem statement not found: %s", problem_paths.problem_statement)
             sys.exit(1)
@@ -326,12 +370,18 @@ def main():
         # Add final status
         print("\nAll generations completed!")
         print("=" * 60)
+        
+        if log_file:
+            logger.info("✅ All model generations completed successfully!")
+            logger.info("="*60)
 
     except Exception as e:
         logger.error("❌ Execution error:")
         logger.error("=" * 60)
         logger.error(traceback.format_exc())
         logger.error("=" * 60)
+        if log_file:
+            logger.error("Session ended with error. Check log file for details: %s", log_file)
         sys.exit(1)
 
 

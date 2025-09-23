@@ -170,7 +170,7 @@ def run_tests(
     test_cases: List[Dict[str, str]],
     time_limit: float = 5.0,
     run_full_suite: bool = False,
-    memory_limit: str = 512,
+    memory_limit: int = 512,
     cpu_limit: str = "1.5"
 ) -> Dict:
     """

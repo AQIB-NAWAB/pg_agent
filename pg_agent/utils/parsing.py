@@ -39,6 +39,4 @@ def extract_cpp_code(raw):
     if matches:
         return matches[-1].strip()
         
-    # Fallback: if no code blocks found, clean up any stray backticks and return the whole text
-    raw = re.sub(r"```+", "", raw)
-    return raw.strip()
+    return ""

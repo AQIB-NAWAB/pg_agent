@@ -14,9 +14,8 @@ from collections import defaultdict
 from pg_agent.utils.logging import setup_logging, get_log_level
 from pg_agent.utils.structure import get_default_problem_dir, get_problem_paths
 from pg_agent.utils.test_runner import run_tests, find_test_cases
-from pg_agent.utils.env import get_available_models
-# --- Constants ---
-SPECIAL_SOLUTIONS = ["solution_bf.cpp", "standard.cpp"]
+from pg_agent.utils.env import get_available_models, get_settings
+# Note: SPECIAL_SOLUTIONS and file extensions will be set dynamically based on language
 ALL_MODELS = get_available_models("model_sol")
 
 ERROR_CODES = {
@@ -66,7 +65,7 @@ def _create_smart_diff(expected: str, actual: str, line_threshold: int) -> str:
         return f"**Difference Snippet (first 50 lines of diff):**\n```diff\n{diff_snippet}\n```"
 
 
-def generate_reports(report_data: dict, report_dir: Path, settings: dict):
+def generate_reports(report_data: dict, report_dir: Path, settings: dict, language: str = "C++"):
     """Orchestrates the creation of all Markdown reports in a hierarchical structure."""
     
     def get_error_legend() -> str:
@@ -99,7 +98,11 @@ def generate_reports(report_data: dict, report_dir: Path, settings: dict):
                 f.write(f"**Overall Status:** ❌ FAILURE\n")
                 
             f.write(f"**Score:** {summary.get('passed', 0)} / {summary.get('total_available', 0)} ({summary.get('total_run', 0)} tests executed)\n\n")
-            f.write(f"**Compilation Command:** `g++ -std=c++20 -O2 -w -o executable solution.cpp`\n\n")
+            
+            if language == "C++":
+                f.write(f"**Compilation Command:** `g++ -std=c++20 -O2 -w -o executable solution.cpp`\n\n")
+            else:
+                f.write(f"**Execution Command:** `python3 solution.py`\n\n")
 
             f.write("## Test Case Results\n\n")
             f.write("| Test Case | Status | Time (s) | Memory (MB) |\n")
@@ -223,7 +226,15 @@ def print_terminal_summary(report_data: dict):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate and/or test external model solutions.")
+    # Load language setting from global settings
+    settings = get_settings()
+    language = settings.get("language", "C++")
+    
+    # Set language-specific constants
+    file_ext = "cpp" if language == "C++" else "py"
+    special_solutions = [f"solution_bf.{file_ext}", f"standard.{file_ext}"]
+    
+    parser = argparse.ArgumentParser(description=f"Generate and/or test external {language} model solutions.")
     parser.add_argument("problem_dir", type=str, nargs="?", default=get_default_problem_dir(), help="Path to the problem directory.")
     # Generation flags
     parser.add_argument("--generate", action="store_true", help="Enable the solution generation phase.")
@@ -243,6 +254,8 @@ def main():
     # Setup
     setup_logging()
     logger = logging.getLogger(__name__)
+    
+    logger.info(f"Using language: {language}")
 
     if not args.generate:
         logger.info("No generation requested. Proceeding with testing only.")
@@ -303,15 +316,15 @@ def main():
     elif args.solutions_dir:
         sol_dir = Path(args.solutions_dir).resolve()
         if sol_dir.is_dir():
-            for cpp_file in sorted(sol_dir.glob("*.cpp")):
-                solutions_to_test[cpp_file] = f"{sol_dir.name}/{cpp_file.name}"
+            for solution_file in sorted(sol_dir.glob(f"*.{file_ext}")):
+                solutions_to_test[solution_file] = f"{sol_dir.name}/{solution_file.name}"
     else:
         if paths.runs.exists():
             for folder in sorted(paths.runs.iterdir()):
                 if folder.is_dir():
-                    for cpp_file in sorted(folder.glob("*.cpp")):
-                        solutions_to_test[cpp_file.resolve()] = f"{folder.name}/{cpp_file.name}"
-        for sol_name in SPECIAL_SOLUTIONS:
+                    for solution_file in sorted(folder.glob(f"*.{file_ext}")):
+                        solutions_to_test[solution_file.resolve()] = f"{folder.name}/{solution_file.name}"
+        for sol_name in special_solutions:
             sol_path = problem_dir.resolve() / sol_name
             if sol_path.exists():
                 solutions_to_test[sol_path] = sol_name
@@ -338,7 +351,8 @@ def main():
             time_limit=_time_limit,
             run_full_suite=args.full,
             memory_limit=_memory,
-            cpu_limit=args.cpus
+            cpu_limit=args.cpus,
+            language=language
         )
         report_data["solutions"][unique_name] = test_report
     
@@ -349,7 +363,7 @@ def main():
     report_dir = paths.reports_dir / f"{problem_dir.name}_{timestamp}"
     report_dir.mkdir(parents=True, exist_ok=True)
     
-    generate_reports(report_data, report_dir, settings)
+    generate_reports(report_data, report_dir, settings, language)
     
     (report_dir / "summary.json").write_text(json.dumps(report_data, indent=2, ensure_ascii=False))
     logger.info(f"All reports generated in: {report_dir}")

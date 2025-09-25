@@ -117,9 +117,20 @@ elif [ "$MODE" = "execute_suite" ]; then
     exit 0
     
 elif [ "$MODE" = "validate_suite" ]; then
-    echo "--- Mode: VALIDATE SUITE (Detailed) ---"
-    echo "Compiling validator.cpp..."
-    g++ -std=c++14 -O2 -o validator validator.cpp
+    LANGUAGE=${2:-"C++"}  # Default to C++ if not provided
+    echo "--- Mode: VALIDATE SUITE ($LANGUAGE) (Detailed) ---"
+    
+    if [ "$LANGUAGE" = "C++" ]; then
+        echo "Compiling validator.cpp..."
+        g++ -std=c++14 -O2 -o validator validator.cpp
+        VALIDATOR_CMD="./validator"
+    elif [ "$LANGUAGE" = "Python" ]; then
+        echo "Using Python validator..."
+        VALIDATOR_CMD="python3 validator.py"
+    else
+        echo "Unsupported language: $LANGUAGE"
+        exit 1
+    fi
 
     if ! ls -d *.in > /dev/null 2>&1; then
         echo "Warning: No .in files found to validate."
@@ -134,7 +145,7 @@ elif [ "$MODE" = "validate_suite" ]; then
         
         # We run the validator and check its exit code directly.
         # Stderr is captured to get the reason for invalid cases.
-        if ./validator < "${infile}" 2> validator_error.log; then
+        if $VALIDATOR_CMD < "${infile}" 2> validator_error.log; then
             echo "STATUS:VALID"
         else
             REASON=$(cat validator_error.log || echo "Unknown validation error")

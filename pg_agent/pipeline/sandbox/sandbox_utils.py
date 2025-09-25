@@ -68,7 +68,7 @@ def run_generator_script(script_path: str, output_dir: Path, language: str = "C+
     if status_code != 0:
         raise Exception(f"Generator script failed:\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}")
 
-def run_validation_suite(validator_path: str, all_input_files: List[Path]) -> Dict:
+def run_validation_suite(validator_path: str, all_input_files: List[Path], language: str = "C++") -> Dict:
     """
     Uses the central Docker utility to run a validator against all test cases
     and returns a detailed report object.
@@ -82,7 +82,8 @@ def run_validation_suite(validator_path: str, all_input_files: List[Path]) -> Di
     with tempfile.TemporaryDirectory() as temp_dir_str:
         work_dir = Path(temp_dir_str)
         # Prepare the temporary directory with the validator and all input files
-        shutil.copy(validator_path, work_dir / "validator.cpp")
+        validator_filename = "validator.cpp" if language == "C++" else "validator.py"
+        shutil.copy(validator_path, work_dir / validator_filename)
         for in_file in all_input_files:
             shutil.copy(in_file, work_dir / in_file.name)
         
@@ -98,7 +99,7 @@ def run_validation_suite(validator_path: str, all_input_files: List[Path]) -> Di
             raise FileNotFoundError(f"runner.sh not found at expected location: {runner_sh_path}")
 
         # Define the command to be executed inside the container
-        command = "/bin/bash runner.sh validate_suite"
+        command = f"/bin/bash runner.sh validate_suite {language}"
         
         try:
             if debug:

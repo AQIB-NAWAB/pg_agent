@@ -37,12 +37,15 @@ class TestSuiteState(TypedDict):
     valid_test_inputs: Optional[List[str]]  # Paths to valid test inputs
     invalid_tests: Optional[List[dict]]  # Details about invalid test cases
     current_solution_index: int  # Index of current solution being processed
+    language: Optional[str]  # Programming language to use (C++ or Python)
 
 
 def load_scripts_node(state: TestSuiteState) -> dict:
-    """Loads the required C++ scripts from the problem root directory."""
+    """Loads the required scripts from the problem root directory."""
     print(f"--- Loading scripts from: {state['problem_dir_path']} ---")
     paths = get_problem_paths(state['problem_dir_path'])
+    language = state.get("language", "C++")
+    logger.info(f"Using language: {language}")
 
     # Create temporary run directory
     run_dir = Path(tempfile.gettempdir()) / f"pg_agent_run_{os.urandom(4).hex()}"
@@ -64,7 +67,8 @@ def load_scripts_node(state: TestSuiteState) -> dict:
 
     # Load validator if in validator mode
     if state["generation_mode"] == "validator":
-        result["validator_path"] = check_script(paths.validator)
+        validator_path = paths.get_validator_path(language)
+        result["validator_path"] = check_script(validator_path)
     
     # Load solution if in outputs mode
     if state["generation_mode"] == "outputs":
@@ -73,30 +77,38 @@ def load_scripts_node(state: TestSuiteState) -> dict:
         # Add bruteforce solution if requested
         if state.get("use_bruteforce", False):
             try:
-                bruteforce_path = check_script(paths.bruteforce_solution)
+                bruteforce_solution_path = paths.get_bruteforce_solution_path(language)
+                bruteforce_path = check_script(bruteforce_solution_path)
                 solutions_to_process.append({
                     "type": "bruteforce",
                     "path": bruteforce_path,
                     "time_limit": state["bruteforce_time_limit"],
-                    "memory_limit": 512
+                    "memory_limit": 512,
+                    "language": language
                 })
-                logger.info("Added bruteforce solution (solution_bf.cpp) for output generation")
+                file_ext = "cpp" if language == "C++" else "py"
+                logger.info(f"Added bruteforce solution (solution_bf.{file_ext}) for output generation")
             except FileNotFoundError:
-                logger.warning("Bruteforce solution (solution_bf.cpp) not found, skipping")
+                file_ext = "cpp" if language == "C++" else "py"
+                logger.warning(f"Bruteforce solution (solution_bf.{file_ext}) not found, skipping")
         
         # Add optimal solution if requested
         if state.get("use_optimal", False):
             try:
-                optimal_path = check_script(paths.standard_solution)
+                standard_solution_path = paths.get_standard_solution_path(language)
+                optimal_path = check_script(standard_solution_path)
                 solutions_to_process.append({
                     "type": "optimal",
                     "path": optimal_path,
                     "time_limit": state["bruteforce_time_limit"],
-                    "memory_limit": 512
+                    "memory_limit": 512,
+                    "language": language
                 })
-                logger.info("Added optimal solution (standard.cpp) for output generation")
+                file_ext = "cpp" if language == "C++" else "py"
+                logger.info(f"Added optimal solution (standard.{file_ext}) for output generation")
             except FileNotFoundError:
-                logger.warning("Optimal solution (standard.cpp) not found, skipping")
+                file_ext = "cpp" if language == "C++" else "py"
+                logger.warning(f"Optimal solution (standard.{file_ext}) not found, skipping")
         
         if not solutions_to_process:
             raise FileNotFoundError("No valid solutions found for output generation")
@@ -128,7 +140,8 @@ def validate_inputs_node(state: TestSuiteState) -> dict:
         return {"validation_report": {"summary": {"status": "SUCCESS", "message": "No input files found."}}}
 
     # Call the new detailed validation runner
-    validation_report = run_validation_suite(state['validator_path'], all_inputs)
+    language = state.get("language", "C++")
+    validation_report = run_validation_suite(state['validator_path'], all_inputs, language)
     
     # Log invalid test cases from the new report structure
     invalid_tests = [res for res in validation_report.get("results", []) if res["status"] == "INVALID"]
@@ -190,12 +203,14 @@ def generate_outputs_node(state: TestSuiteState) -> dict:
                 shutil.copy(full_path, temp_dir)
                 
             # Run all tests with this solution
+            solution_language = solution_config.get("language", "C++")
             run_test_suite(
                 solution_path=solution_path,
                 test_cases_dir=temp_dir,
                 time_limit=time_limit,
                 memory_limit=memory_limit,
-                run_full_suite=True
+                run_full_suite=True,
+                language=solution_language
             )
             
             # Process results for this solution

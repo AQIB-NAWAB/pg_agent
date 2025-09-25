@@ -15,6 +15,7 @@ from pg_agent.nodes.test_suite_nodes import (
 )
 from pg_agent.utils.logging import setup_logging, get_log_level
 from pg_agent.utils.structure import get_default_problem_dir, get_problem_paths
+from pg_agent.utils.env import get_settings
 
 def build_test_suite_graph(mode: str = "outputs") -> StateGraph:
     """Builds the graph for test suite generation and validation workflow.
@@ -91,6 +92,11 @@ def main():
     if not args.problem_dir:
         parser.error("No problem directory specified and could not read default from settings")
 
+    # Load language setting from global settings
+    settings = get_settings()
+    language = settings.get("language", "C++")
+    logger.info(f"Using language: {language}")
+    
     # Get problem paths and validate required files exist
     paths = get_problem_paths(args.problem_dir)
     
@@ -109,26 +115,30 @@ def main():
 
     # Check required files based on mode
     if args.mode == "validator":
-        if not paths.root_validator.exists() and not paths.automation_validator.exists():
+        validator_path = paths.get_validator_path(language)
+        if not validator_path.exists() and not paths.automation_validator.exists():
             logger.error("Validator not found at either:")
-            logger.error("  - %s", paths.root_validator)
+            logger.error("  - %s", validator_path)
             logger.error("  - %s", paths.automation_validator)
             logger.error("Please run test generator workflow first or create validator manually.")
             sys.exit(1)
     else:  # outputs mode
         # Check that at least one solution exists
         solutions_exist = False
-        if run_bruteforce and paths.bruteforce_solution.exists():
+        bruteforce_path = paths.get_bruteforce_solution_path(language)
+        standard_path = paths.get_standard_solution_path(language)
+        
+        if run_bruteforce and bruteforce_path.exists():
             solutions_exist = True
-        if run_optimal and paths.standard_solution.exists():
+        if run_optimal and standard_path.exists():
             solutions_exist = True
         
         if not solutions_exist:
             logger.error("No valid solutions found:")
             if run_bruteforce:
-                logger.error("  - Bruteforce solution not found at %s", paths.bruteforce_solution)
+                logger.error("  - Bruteforce solution not found at %s", bruteforce_path)
             if run_optimal:
-                logger.error("  - Optimal solution not found at %s", paths.standard_solution)
+                logger.error("  - Optimal solution not found at %s", standard_path)
             logger.error("Please ensure required solution files exist or adjust the --use-bf-only/--use-opt-only flags.")
             sys.exit(1)
 
@@ -146,6 +156,7 @@ def main():
         "valid_test_inputs": None,
         "invalid_tests": None,
         "current_solution_index": 0,
+        "language": language
     }
 
     # Run the workflow

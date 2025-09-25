@@ -32,18 +32,20 @@ class ProblemPaths:
         # Test case generator script directory in automation (for versioned files)
         self.testcase_gen_script_dir = self.automation / "testcaseGenScript"
 
-    def get_run_paths(self, model_name: str, index: int) -> tuple[Path, Path, Path]:
+    def get_run_paths(self, model_name: str, index: int, language: str = "C++") -> tuple[Path, Path, Path, Path]:
         """Gets the paths for code and response files for a specific run.
         
         Args:
             model_name: Name of the model used
             index: Run index
+            language: Programming language ("C++" or "Python")
             
         Returns:
-            Tuple of (code_path, prompt_path, response_path) where:
-            - code_path: Path to the clean C++ code file in runs/
+            Tuple of (code_path, prompt_path, response_path, reasoning_path) where:
+            - code_path: Path to the clean code file in runs/
             - prompt_path: Path to save the prompt in runs/
             - response_path: Path to save the raw response in automation/runs/
+            - reasoning_path: Path to save the reasoning in automation/runs/
         """
         # Create directories
         model_dir = self.runs / model_name
@@ -51,8 +53,11 @@ class ProblemPaths:
         automation_model_dir = self.automation_runs / model_name
         automation_model_dir.mkdir(parents=True, exist_ok=True)
         
+        # Determine file extension based on language
+        file_ext = "cpp" if language == "C++" else "py"
+        
         return (
-            model_dir / f"run_{index:02d}.cpp",  # Clean code
+            model_dir / f"run_{index:02d}.{file_ext}",  # Clean code
             model_dir / "prompt.txt",  # Prompt
             automation_model_dir / f"run_{index:02d}.md",  # Raw response
             automation_model_dir / f"run_{index:02d}.reasoning.md"  # Reasoning

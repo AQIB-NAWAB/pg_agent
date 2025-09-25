@@ -14,7 +14,7 @@ from pg_agent.nodes.optimal_nodes import (
 from pg_agent.utils.logging import setup_logging, get_log_level
 from pg_agent.utils.structure import get_default_problem_dir, get_problem_paths
 from pg_agent.utils.models import get_llm
-from pg_agent.utils.env import get_available_models, default_model, load_env
+from pg_agent.utils.env import get_available_models, default_model, load_env, get_settings
 
 def get_next_version(problem_dir: Path) -> int:
     """Get the next version number for optimal solution."""
@@ -93,6 +93,11 @@ def main():
     model_config = load_env(model=args.model)
     llm = get_llm(model_config)
 
+    # Load language setting from global settings
+    settings = get_settings()
+    language = settings.get("language", "C++")
+    logger.info(f"Using language: {language}")
+
     # Prepare initial state
     initial_state: OptimalSolutionState = {
         "problem_dir_path": str(problem_dir),
@@ -107,8 +112,8 @@ def main():
         "is_refinement": args.refine is not None,  # True if --refine was used
         "final_verdict": None,
         "final_optimal_path": None,
-        "llm": llm
-
+        "llm": llm,
+        "language": language
     }
 
     # Run the workflow

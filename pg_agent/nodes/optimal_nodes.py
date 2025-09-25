@@ -10,6 +10,7 @@ import re
 
 from ..utils.structure import get_problem_paths
 from ..utils.test_runner import find_test_cases, run_tests
+from ..utils.env import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ class OptimalSolutionState(TypedDict):
     final_verdict: Optional[Literal["SUCCESS", "FAILURE"]]
     final_optimal_path: Optional[str]
     llm: any  # LLM client injected from workflow
+    language: Optional[str]  # Programming language to use (C++ or Python)
 
 def load_context_node(state: OptimalSolutionState) -> dict:
     """Loads problem statement, bruteforce solution, and example test cases."""
@@ -41,15 +43,19 @@ def load_context_node(state: OptimalSolutionState) -> dict:
     problem_statement = paths.problem_statement.read_text(encoding="utf-8")
     logger.info("Loaded problem statement")
     
-    # Load bruteforce solution from solution_bf.cpp if it exists
+    # Get language setting and load appropriate bruteforce solution
+    language = state.get("language", "C++")
+    logger.info(f"Using language: {language}")
+    
+    bruteforce_solution_path = paths.get_bruteforce_solution_path(language)
     bruteforce_code = ""
-    if paths.bruteforce_solution.exists():
-        bruteforce_code = paths.bruteforce_solution.read_text(encoding="utf-8").strip()
+    if bruteforce_solution_path.exists():
+        bruteforce_code = bruteforce_solution_path.read_text(encoding="utf-8").strip()
         logger.info("Loaded bruteforce solution from %s (%d chars)", 
-                    paths.bruteforce_solution, len(bruteforce_code))
+                    bruteforce_solution_path, len(bruteforce_code))
     else:
         logger.warning("No bruteforce solution found at %s, proceeding without it", 
-                      paths.bruteforce_solution)
+                      bruteforce_solution_path)
     
     # Load test cases using test_runner utility
     test_cases = find_test_cases(paths.test_cases)
@@ -65,15 +71,20 @@ def generate_optimal_node(state: OptimalSolutionState) -> dict:
     """Generates an optimal solution based on problem statement and bruteforce solution."""
     logger.info("Generating optimal solution")
 
-	# Check if we're in refinement mode
+    # Check if we're in refinement mode
     paths = get_problem_paths(state["problem_dir_path"])
-    variables = {"problem_statement": state["problem_statement"], "bruteforce_code": state["bruteforce_code"]}
+    language = state.get("language", "C++")
+    variables = {
+        "problem_statement": state["problem_statement"], 
+        "bruteforce_code": state["bruteforce_code"],
+        "language": language
+    }
 
     if state["is_refinement"]:
         prev_version = state.get("iteration_count", 0) - 1
         
         # Load previous optimal solution
-        prev_solution_path = paths.get_optimal_path(prev_version)
+        prev_solution_path = paths.get_optimal_path(prev_version, language)
         if not prev_solution_path.exists():
             raise FileNotFoundError(f"Previous optimal solution not found at {prev_solution_path}")
         previous_optimal = prev_solution_path.read_text(encoding="utf-8")
@@ -98,7 +109,8 @@ def generate_optimal_node(state: OptimalSolutionState) -> dict:
             "bruteforce_code": state["bruteforce_code"],
             "previous_optimal": previous_optimal,
             "test_failures": json.dumps(failures, indent=2),
-            "feedback": feedback
+            "feedback": feedback,
+            "language": language
         }
     else:
         # Use basic generation prompt
@@ -106,7 +118,8 @@ def generate_optimal_node(state: OptimalSolutionState) -> dict:
         prompt = ChatPromptTemplate.from_template(prompt_path.read_text(encoding="utf-8"))
         variables = {
             "problem_statement": state["problem_statement"],
-            "bruteforce_code": state["bruteforce_code"]
+            "bruteforce_code": state["bruteforce_code"],
+            "language": language
         }
     
     # Debug: Print the final rendered prompt
@@ -122,16 +135,23 @@ def generate_optimal_node(state: OptimalSolutionState) -> dict:
     chain = prompt | state["llm"]
     response = chain.invoke(variables)
     
-    # Extract code from response
-    code_match = re.search(r'```(?:cpp)?\s*([\s\S]+?)\s*```', response.content)
+    # Extract code from response based on language
+    language_regex = {
+        "C++": r'```(?:cpp|c\+\+)?\s*([\s\S]+?)\s*```',
+        "Python": r'```(?:python|py)?\s*([\s\S]+?)\s*```'
+    }
+    
+    pattern = language_regex.get(language, r'```(?:cpp|python|py|c\+\+)?\s*([\s\S]+?)\s*```')
+    code_match = re.search(pattern, response.content)
     if not code_match:
         raise ValueError("Could not extract code from LLM response")
     
     optimal_code = code_match.group(1).strip()
 
-    # Save solution
+    # Save solution with appropriate file extension
     iteration = state.get("iteration_count", 0)
-    solution_path = paths.get_optimal_path(iteration)
+    file_ext = "cpp" if language == "C++" else "py"
+    solution_path = paths.optimal_dir / f"optimalSolution_v{iteration}.{file_ext}"
     
     # Create directory if needed
     paths.optimal_dir.mkdir(parents=True, exist_ok=True)
@@ -163,9 +183,11 @@ def test_optimal_node(state: OptimalSolutionState) -> dict:
     paths = get_problem_paths(state["problem_dir_path"])
     
     # Run tests to get the detailed report object
+    language = state.get("language", "C++")
     test_report = run_tests(
         solution_code=state["optimal_code"],
-        test_cases=state["example_test_cases"]
+        test_cases=state["example_test_cases"],
+        language=language
     )
 
     # Add code and test path to the main report 
@@ -199,7 +221,8 @@ def test_optimal_node(state: OptimalSolutionState) -> dict:
         # The state still only needs the list of failed cases for potential refinement
         return {**state, "test_failures": failed_cases, "final_verdict": None}
     else:
-        # On success, still copy the code to standard.cpp as a clear signal
-        paths.standard_solution.write_text(state["optimal_code"], encoding="utf-8")
-        logger.info("Copied successful solution to: %s", paths.standard_solution)
+        # On success, copy the code to standard solution with appropriate extension
+        standard_path = paths.get_standard_solution_path(language)
+        standard_path.write_text(state["optimal_code"], encoding="utf-8")
+        logger.info("Copied successful solution to: %s", standard_path)
         return {**state, "test_failures": [], "final_verdict": "SUCCESS"}

@@ -63,9 +63,15 @@ class ProblemPaths:
         """Gets the validator path, preferring root directory over automation directory."""
         return self.root_validator if self.root_validator.exists() else self.automation_validator
 
-    def get_optimal_path(self, version: int) -> Path:
+    def get_optimal_path(self, version: int, language: str = "C++") -> Path:
         """Gets the path for a specific version of optimal solution."""
-        return self.optimal_dir / f"optimalSolution_v{version}.cpp"
+        file_ext = "cpp" if language == "C++" else "py"
+        return self.optimal_dir / f"optimalSolution_v{version}.{file_ext}"
+    
+    def get_standard_solution_path(self, language: str = "C++") -> Path:
+        """Gets the standard solution path with appropriate file extension."""
+        file_ext = "cpp" if language == "C++" else "py"
+        return self.root / f"standard.{file_ext}"
 
     def get_settings(self) -> Dict:
         """Reads and returns the automation settings."""

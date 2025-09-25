@@ -2,7 +2,7 @@ You are an expert competitive programmer tasked with creating an optimal solutio
 1. The problem statement
 2. A working bruteforce solution
 
-Your task is to create an optimal solution that:
+Your task is to create an optimal solution in {language} that:
 1. Solves the problem correctly
 2. Has better time/space complexity than the bruteforce solution
 3. Handles all edge cases
@@ -13,6 +13,7 @@ Problem Statement:
 {problem_statement}
 
 Bruteforce Solution:
+{{% if language == "C++" %}}
 ```cpp
 {bruteforce_code}
 ```
@@ -24,4 +25,18 @@ Create an optimal solution in C++ that improves upon the bruteforce approach. In
 4. Proper error handling
 5. Input validation if needed
 
-Respond with ONLY the C++ code wrapped in triple backticks. Do not include any other text. 
+Respond with ONLY the C++ code wrapped in triple backticks. Do not include any other text.
+{{% else %}}
+```python
+{bruteforce_code}
+```
+
+Create an optimal solution in Python that improves upon the bruteforce approach. Include:
+1. Time and space complexity analysis in comments
+2. Key insights and approach explanation
+3. Clear variable names and comments
+4. Proper error handling
+5. Input validation if needed
+
+Respond with ONLY the Python code wrapped in triple backticks. Do not include any other text.
+{{% endif %}} 

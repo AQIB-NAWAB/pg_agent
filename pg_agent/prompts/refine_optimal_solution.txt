@@ -5,7 +5,7 @@ You are an expert competitive programmer tasked with refining an existing optima
 4. Test failures from the previous version (if any)
 5. Feedback for improvement
 
-Your task is to create an improved optimal solution that:
+Your task is to create an improved optimal solution in {language} that:
 1. Maintains correctness (passes all test cases)
 2. Fixes any test failures from the previous version
 3. Addresses the feedback provided
@@ -16,6 +16,7 @@ Your task is to create an improved optimal solution that:
 Problem Statement:
 {problem_statement}
 
+{{% if language == "C++" %}}
 Bruteforce Solution:
 ```cpp
 {bruteforce_code}
@@ -41,4 +42,32 @@ Create an improved optimal solution in C++ that addresses both the test failures
 
 Make sure your solution specifically addresses both the test failures and feedback provided while maintaining or improving overall quality.
 
-Respond with ONLY the C++ code wrapped in triple backticks. Do not include any other text. 
+Respond with ONLY the C++ code wrapped in triple backticks. Do not include any other text.
+{{% else %}}
+Bruteforce Solution:
+```python
+{bruteforce_code}
+```
+
+Previous Optimal Solution:
+```python
+{previous_optimal}
+```
+
+Previous Test Failures:
+{test_failures}
+
+Feedback to Address:
+{feedback}
+
+Create an improved optimal solution in Python that addresses both the test failures and feedback while maintaining correctness. Include:
+1. Time and space complexity analysis in comments
+2. Key insights and approach explanation
+3. Clear variable names and comments
+4. Proper error handling
+5. Input validation if needed
+
+Make sure your solution specifically addresses both the test failures and feedback provided while maintaining or improving overall quality.
+
+Respond with ONLY the Python code wrapped in triple backticks. Do not include any other text.
+{{% endif %}} 

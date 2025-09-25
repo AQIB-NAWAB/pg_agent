@@ -43,11 +43,14 @@ def _run_command_in_container(image_tag: str, command: str, work_dir: Path, inpu
     stderr = process.stderr.decode('utf-8', errors='ignore')
     return process.returncode, stdout, stderr
 
-def run_generator_script(script_path: str, output_dir: Path):
+def run_generator_script(script_path: str, output_dir: Path, language: str = "C++"):
     """Compiles and runs a generator script inside the mounted output_dir using runner.sh."""
     work_dir = output_dir
     work_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy(script_path, work_dir / "generator.cpp")
+    
+    # Copy script with appropriate name based on language
+    script_name = "generator.cpp" if language == "C++" else "generator.py"
+    shutil.copy(script_path, work_dir / script_name)
     
     # Copy and prepare runner.sh
     runner_sh_path = Path(__file__).parent / "runner.sh"
@@ -58,8 +61,8 @@ def run_generator_script(script_path: str, output_dir: Path):
     else:
         raise FileNotFoundError(f"runner.sh not found at expected location: {runner_sh_path}")
     
-    # Use runner.sh to generate test cases
-    command = "/bin/bash runner.sh generate"
+    # Use runner.sh to generate test cases, passing language as parameter
+    command = f"/bin/bash runner.sh generate {language}"
     status_code, stdout, stderr = _run_command_in_container(DOCKER_IMAGE_TAG, command, work_dir)
     print(f"Generator script output:\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}")
     if status_code != 0:

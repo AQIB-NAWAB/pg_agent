@@ -72,6 +72,21 @@ class ProblemPaths:
         """Gets the standard solution path with appropriate file extension."""
         file_ext = "cpp" if language == "C++" else "py"
         return self.root / f"standard.{file_ext}"
+    
+    def get_test_generator_path(self, language: str = "C++") -> Path:
+        """Gets the test generator path with appropriate file extension."""
+        file_ext = "cpp" if language == "C++" else "py"
+        return self.root / f"test_generator.{file_ext}"
+    
+    def get_edge_generator_path(self, language: str = "C++") -> Path:
+        """Gets the edge generator path with appropriate file extension."""
+        file_ext = "cpp" if language == "C++" else "py"
+        return self.root / f"edge_generator.{file_ext}"
+    
+    def get_validator_path(self, language: str = "C++") -> Path:
+        """Gets the validator path with appropriate file extension."""
+        file_ext = "cpp" if language == "C++" else "py"
+        return self.root / f"validator.{file_ext}"
 
     def get_settings(self) -> Dict:
         """Reads and returns the automation settings."""

@@ -15,7 +15,7 @@ from pg_agent.nodes.test_generator_nodes import (
 from pg_agent.utils.logging import setup_logging, get_log_level
 from pg_agent.utils.structure import get_default_problem_dir, get_problem_paths
 from pg_agent.utils.models import get_llm
-from pg_agent.utils.env import get_available_models, default_model, load_env
+from pg_agent.utils.env import get_available_models, default_model, load_env, get_settings
 
 def build_test_generator_graph(mode: str = "basic", exec_only: bool = False) -> StateGraph:
     """Builds the graph for generating test cases and validator.
@@ -150,13 +150,23 @@ Examples:
         logger.error("Error: automation_settings.json not found. Please run bruteforce generator first.")
         sys.exit(1)
     
+    # Load language setting from global settings
+    settings = get_settings()
+    language = settings.get("language", "C++")
+    logger.info(f"Using language: {language}")
+    
     # If exec-only mode is enabled, check that required generators exist
     if args.exec_only:
         missing_generators = []
-        if args.mode in ["basic", "all"] and not problem_paths.test_generator.exists():
-            missing_generators.append("test_generator.cpp")
-        if args.mode in ["edge", "all"] and not problem_paths.edge_generator.exists():
-            missing_generators.append("edge_generator.cpp")
+        file_ext = "cpp" if language == "C++" else "py"
+        
+        basic_gen_path = problem_paths.get_test_generator_path(language)
+        edge_gen_path = problem_paths.get_edge_generator_path(language)
+        
+        if args.mode in ["basic", "all"] and not basic_gen_path.exists():
+            missing_generators.append(f"test_generator.{file_ext}")
+        if args.mode in ["edge", "all"] and not edge_gen_path.exists():
+            missing_generators.append(f"edge_generator.{file_ext}")
         
         if missing_generators:
             logger.error("Error: --exec-only mode requested but the following generators are missing:")
@@ -182,7 +192,8 @@ Examples:
         "user_feedback": args.refine or "",  # Use feedback from --refine argument
         "generation_mode": args.mode,
         "llm": llm,
-        "generated_test_cases": None
+        "generated_test_cases": None,
+        "language": language
     }
 
     # Run the workflow

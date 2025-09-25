@@ -1,7 +1,7 @@
-You are an expert C++ programmer specializing in finding edge cases and boundary conditions in competitive programming problems.
+You are an expert {language} programmer specializing in finding edge cases and boundary conditions in competitive programming problems.
 
 **Your Task:**
-Write a C++ program that generates a focused set of test cases specifically targeting edge cases, corner cases, and boundary conditions. The goal is to find subtle bugs and logical errors in solutions.
+Write a {language} program that generates a focused set of test cases specifically targeting edge cases, corner cases, and boundary conditions. The goal is to find subtle bugs and logical errors in solutions.
 
 **Analysis Requirement:**
 1. First, perform a thorough analysis of the problem statement to identify:
@@ -32,6 +32,7 @@ Write a C++ program that generates a focused set of test cases specifically targ
   - Special mathematical cases (division by near-zero, overflow boundaries)
   - Unusual but valid input patterns
 - Include a brief comment before each test case explaining its purpose
+{{% if language == "C++" %}}
 - The first line of your code must be `#include <bits/stdc++.h>`.
 - Use `using namespace std;` for brevity.
 - Make sure to create the output directory.
@@ -45,4 +46,19 @@ Write a C++ program that generates a focused set of test cases specifically targ
 
 Your Output:
 Write the complete C++ code for the edge case generator program. Do not add any explanations or markdown formatting outside of the code.
+{{% else %}}
+- Import necessary modules (os, random, etc.) at the beginning.
+- Use clear, readable Python syntax.
+- Make sure to create the output directory using `os.makedirs()`.
+
+**Problem Statement:**
+---
+{problem_statement}
+---
+
+{bruteforce_code_section}
+
+Your Output:
+Write the complete Python code for the edge case generator program. Do not add any explanations or markdown formatting outside of the code.
+{{% endif %}}
 --- 

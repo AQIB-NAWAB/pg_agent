@@ -27,11 +27,19 @@ class TestCaseGeneratorState(TypedDict):
     generation_mode: Literal["basic", "edge", "validator", "all"]  # The generation mode to use
     llm: Any  # LLM client injected from workflow
     generated_test_cases: Optional[Dict[str, list]]  # Paths to generated test case files
+    language: Optional[str]  # Programming language to use (C++ or Python)
     
-def _extract_cpp_code(response_content: str) -> str:
-    """Parses the LLM's response to extract only the C++ code."""
-    match = re.search(r'```(?:cpp)?\s*([\s\S]+?)\s*```', response_content)
-    if match: return match.group(1).strip()
+def _extract_code(response_content: str, language: str = "C++") -> str:
+    """Parses the LLM's response to extract code based on language."""
+    language_regex = {
+        "C++": r'```(?:cpp|c\+\+)?\s*([\s\S]+?)\s*```',
+        "Python": r'```(?:python|py)?\s*([\s\S]+?)\s*```'
+    }
+    
+    pattern = language_regex.get(language, r'```(?:cpp|python|py|c\+\+)?\s*([\s\S]+?)\s*```')
+    match = re.search(pattern, response_content)
+    if match: 
+        return match.group(1).strip()
     return response_content.strip()
 
 def load_context_node(state: TestCaseGeneratorState) -> dict:
@@ -52,11 +60,13 @@ def load_context_node(state: TestCaseGeneratorState) -> dict:
     # Try to load bruteforce solution if we're generating tests
     bruteforce_code = None
     if state["generation_mode"] in ["basic", "edge", "all"]:
-        if paths.bruteforce_solution.exists():
-            bruteforce_code = paths.bruteforce_solution.read_text(encoding="utf-8")
-            logger.info("Loaded bruteforce solution from %s", paths.bruteforce_solution)
+        language = state.get("language", "C++")
+        bruteforce_solution_path = paths.get_bruteforce_solution_path(language)
+        if bruteforce_solution_path.exists():
+            bruteforce_code = bruteforce_solution_path.read_text(encoding="utf-8")
+            logger.info("Loaded bruteforce solution from %s", bruteforce_solution_path)
         else:
-            logger.info("No bruteforce solution found at %s", paths.bruteforce_solution)
+            logger.info("No bruteforce solution found at %s", bruteforce_solution_path)
     
     return {
         "problem_statement": problem_statement,
@@ -103,41 +113,52 @@ def _create_generation_node(prompt_file_name: str, output_key: str, version_key:
         chain = prompt | llm
         
         # Include existing code and feedback in prompt if refining
+        language = state.get("language", "C++")
         variables = {
             "problem_statement": state["problem_statement"],
-            "bruteforce_code_section": ""
+            "bruteforce_code_section": "",
+            "language": language
         }
         
         # Add bruteforce code section if available
         if state["bruteforce_code"]:
-            variables["bruteforce_code_section"] = "\n**Provided Bruteforce Solution (for analysis):**\n```cpp\n" + state["bruteforce_code"] + "\n```"
+            lang_tag = "cpp" if language == "C++" else "python"
+            variables["bruteforce_code_section"] = f"\n**Provided Bruteforce Solution (for analysis):**\n```{lang_tag}\n" + state["bruteforce_code"] + "\n```"
         
         if state["refine_mode"] and existing_code:
             variables["existing_code"] = existing_code
             variables["user_feedback"] = state["user_feedback"]
             
         response = chain.invoke(variables)
-        code = _extract_cpp_code(response.content)
+        code = _extract_code(response.content, language)
         
         # Save the generated code to both automation directory (versioned) and root directory (latest)
         new_version = current_version + 1 if current_version >= 0 else 0
         file_prefix = paths.get_script_type_from_version_key(version_key)
+        file_ext = "cpp" if language == "C++" else "py"
         
         try:
             # Ensure automation directory exists
             paths.testcase_gen_script_dir.mkdir(parents=True, exist_ok=True)
             
-            # Save to automation directory with version
-            automation_path = paths.get_testcase_gen_script_path(file_prefix, new_version)
+            # Save to automation directory with version and proper extension
+            automation_path = paths.testcase_gen_script_dir / f"{file_prefix}_v{new_version}.{file_ext}"
             automation_path.write_text(code, encoding="utf-8")
             
-            # Save to root directory with standard name
-            root_path = paths.get_root_generator_path(file_prefix)
+            # Save to root directory with standard name and proper extension
+            if file_prefix == "basicTestcaseGenerator":
+                root_path = paths.get_test_generator_path(language)
+            elif file_prefix == "edgeTestcaseGenerator":
+                root_path = paths.get_edge_generator_path(language)
+            elif file_prefix == "testcaseValidator":
+                root_path = paths.get_validator_path(language)
+            else:
+                root_path = None
+                logger.warning("Unknown generator type: %s", file_prefix)
+            
             if root_path:
                 root_path.write_text(code, encoding="utf-8")
                 logger.info("Saved to problem root: %s", root_path)
-            else:
-                logger.warning("Unknown generator type: %s", file_prefix)
             
             # Update settings with new version
             settings[version_key] = new_version
@@ -154,13 +175,14 @@ def _create_generation_node(prompt_file_name: str, output_key: str, version_key:
 
     return generation_node
 
-def _run_generator_in_docker(generator_path: Path, output_dir: Path, generator_name: str) -> tuple[bool, list]:
+def _run_generator_in_docker(generator_path: Path, output_dir: Path, generator_name: str, language: str = "C++") -> tuple[bool, list]:
     """Runs a test case generator in Docker using the existing sandbox utilities.
     
     Args:
-        generator_path: Path to the C++ generator file
+        generator_path: Path to the generator file (C++ or Python)
         output_dir: Directory to save generated test cases
         generator_name: Name of the generator for logging
+        language: Programming language (C++ or Python)
         
     Returns:
         Tuple of (success, list_of_generated_files)
@@ -177,7 +199,7 @@ def _run_generator_in_docker(generator_path: Path, output_dir: Path, generator_n
         temp_test_cases.mkdir(parents=True, exist_ok=True)
         
         logger.info("Running %s in Docker container...", generator_name)
-        run_generator_script(str(generator_path), temp_path)
+        run_generator_script(str(generator_path), temp_path, language)
         
         # Check if test cases were generated in the test_cases subdirectory
         generated_files = list(temp_test_cases.glob("*.in"))
@@ -219,10 +241,12 @@ def run_test_generator_node(generator_type: str, generator_path: Path, state: Te
     test_cases_dir.mkdir(parents=True, exist_ok=True)
     
     # Run the generator
+    language = state.get("language", "C++")
     success, generated_files = _run_generator_in_docker(
         generator_path, 
         test_cases_dir, 
-        f"{generator_type}_test_generator"
+        f"{generator_type}_test_generator",
+        language
     )
     
     if success:
@@ -236,6 +260,8 @@ def run_test_generator_node(generator_type: str, generator_path: Path, state: Te
         else:
             # For edge generator, update existing test cases
             existing_cases = state.get("generated_test_cases", {})
+            if existing_cases is None:
+                existing_cases = {}
             existing_cases["edge"] = generated_files
             result = {
                 "generated_test_cases": existing_cases
@@ -253,17 +279,22 @@ def run_test_generator_node(generator_type: str, generator_path: Path, state: Te
         if generator_type == "basic":
             return {"generated_test_cases": {}}
         else:
-            return {"generated_test_cases": state.get("generated_test_cases", {})}
+            existing_cases = state.get("generated_test_cases", {})
+            return {"generated_test_cases": existing_cases if existing_cases is not None else {}}
 
 def run_basic_test_generator_node(state: TestCaseGeneratorState) -> dict:
     """Runs the basic test generator in Docker and saves test cases."""
     paths = get_problem_paths(state['problem_dir_path'])
-    return run_test_generator_node("basic", paths.test_generator, state)
+    language = state.get("language", "C++")
+    generator_path = paths.get_test_generator_path(language)
+    return run_test_generator_node("basic", generator_path, state)
 
 def run_edge_test_generator_node(state: TestCaseGeneratorState) -> dict:
     """Runs the edge test generator in Docker and saves test cases."""
     paths = get_problem_paths(state['problem_dir_path'])
-    return run_test_generator_node("edge", paths.edge_generator, state)
+    language = state.get("language", "C++")
+    generator_path = paths.get_edge_generator_path(language)
+    return run_test_generator_node("edge", generator_path, state)
 
 def run_custom_test_generator_node(generator_type: str, generator_path: Path, state: TestCaseGeneratorState) -> dict:
     """Runs a custom test generator in Docker and saves test cases.

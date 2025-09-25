@@ -1,7 +1,7 @@
-You are an expert C++ programmer specializing in designing comprehensive test cases for competitive programming problems.
+You are an expert {language} programmer specializing in designing comprehensive test cases for competitive programming problems.
 
 **Your Task:**
-Write a C++ program that generates a diverse set of test cases covering both small tricky cases and larger stress tests. The goal is to create a comprehensive test suite that can validate both correctness and performance.
+Write a {language} program that generates a diverse set of test cases covering both small tricky cases and larger stress tests. The goal is to create a comprehensive test suite that can validate both correctness and performance.
 
 **Analysis Requirement:**
 1. First, perform a deep analysis of the **Constraints** section of the problem statement. Identify:
@@ -29,6 +29,7 @@ Write a C++ program that generates a diverse set of test cases covering both sma
   - Mix of random and structured data
   - Gradually increase sizes towards maximum constraints
   - Include cases that would challenge inefficient solutions
+{{% if language == "C++" %}}
 - The first line of your code must be `#include <bits/stdc++.h>`.
 - Use `using namespace std;` for brevity.
 - Add brief comments before each major test case section.
@@ -43,4 +44,20 @@ Write a C++ program that generates a diverse set of test cases covering both sma
 
 Your Output:
 Write the complete C++ code for the test case generator program. Do not add any explanations or markdown formatting outside of the code.
+{{% else %}}
+- Import necessary modules (os, random, etc.) at the beginning.
+- Use clear, readable Python syntax.
+- Add brief comments before each major test case section.
+- Make sure to create the output directory using `os.makedirs()`.
+
+**Problem Statement:**
+---
+{problem_statement}
+---
+
+{bruteforce_code_section}
+
+Your Output:
+Write the complete Python code for the test case generator program. Do not add any explanations or markdown formatting outside of the code.
+{{% endif %}}
 --- 

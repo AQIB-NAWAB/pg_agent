@@ -4,7 +4,7 @@ Your Primary Task:
 Your most important task is to perform a deep and careful analysis of the provided Problem Statement. You must deduce the exact input format and all explicit and implicit constraints on the input values.
 
 Your Goal:
-Based on your analysis, write a high-quality C++ "validator" program. This program will read a single test case from standard input (stdin) and rigorously verify that it strictly adheres to all rules you have deduced.
+Based on your analysis, write a high-quality {language} "validator" program. This program will read a single test case from standard input (stdin) and rigorously verify that it strictly adheres to all rules you have deduced.
 
 Comprehensive Validation Logic (You must check all that apply):
 
@@ -40,6 +40,7 @@ After all expected input has been read, ensure there is absolutely no extra, tra
 
 Implementation Requirements:
 
+{{% if language == "C++" %}}
 Your first line of code must be #include <bits/stdc++.h>.
 
 Use using namespace std; for brevity.
@@ -53,4 +54,20 @@ If the input is perfectly valid according to all rules, the program must exit wi
 Problem Statement:
 {problem_statement}
 Your Output:
-Write the complete, self-contained C++ code for the validator program. Do not add any explanations, comments, or markdown formatting. 
+Write the complete, self-contained C++ code for the validator program. Do not add any explanations, comments, or markdown formatting.
+{{% else %}}
+Import necessary modules (sys, etc.) at the beginning.
+
+Use clear, readable Python syntax.
+
+For validation checks, use assert statements. This is standard practice and makes the code clean and readable. For example: assert 1 <= n <= 100000.
+
+If any assertion fails, the program will crash, which is the desired behavior for an invalid test case.
+
+If the input is perfectly valid according to all rules, the program must exit with code 0.
+
+Problem Statement:
+{problem_statement}
+Your Output:
+Write the complete, self-contained Python code for the validator program. Do not add any explanations, comments, or markdown formatting.
+{{% endif %}} 

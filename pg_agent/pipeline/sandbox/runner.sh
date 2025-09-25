@@ -3,13 +3,22 @@
 MODE=$1
 
 if [ "$MODE" = "generate" ]; then
-    echo "--- Mode: GENERATE ---"
+    LANGUAGE=${2:-"C++"}  # Default to C++ if not provided
+    echo "--- Mode: GENERATE ($LANGUAGE) ---"
     
-    echo "Compiling generator.cpp..."
-    g++ -std=c++20 -O2 -o generator generator.cpp
-    
-    echo "Running generator..."
-    ./generator
+    if [ "$LANGUAGE" = "C++" ]; then
+        echo "Compiling generator.cpp..."
+        g++ -std=c++20 -O2 -o generator generator.cpp
+        
+        echo "Running generator..."
+        ./generator
+    elif [ "$LANGUAGE" = "Python" ]; then
+        echo "Running Python generator..."
+        python3 generator.py
+    else
+        echo "Unsupported language: $LANGUAGE"
+        exit 1
+    fi
     
     echo "Test cases generated in current directory"
 

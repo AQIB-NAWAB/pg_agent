@@ -8,7 +8,7 @@ import subprocess
 from typing import List, Dict, Tuple
 
 # Use a versioned tag to avoid rebuilding unnecessarily
-DOCKER_IMAGE_TAG = "pg-agent/cpp-sandbox:1.0"
+DOCKER_IMAGE_TAG = "pg-agent/multi-language-sandbox:2.0"
 
 def _build_image_if_not_exists(client: docker.DockerClient, image_tag: str):
     """Checks if the image exists locally and builds it if it doesn't."""
@@ -148,7 +148,7 @@ def run_validation_suite(validator_path: str, all_input_files: List[Path]) -> Di
 
     return {"summary": summary, "results": detailed_results}
 
-def run_test_suite(solution_path: str, test_cases_dir: Path, time_limit: float, memory_limit: int, run_full_suite: bool):
+def run_test_suite(solution_path: str, test_cases_dir: Path, time_limit: float, memory_limit: int, run_full_suite: bool, language: str = "C++"):
     """
     Runs a single solution against a directory of test cases efficiently.
     Compiles once, then runs all tests in a single container.
@@ -157,7 +157,8 @@ def run_test_suite(solution_path: str, test_cases_dir: Path, time_limit: float, 
     
     # Define source and destination paths using pathlib
     src_path = Path(solution_path)
-    dest_path = work_dir / "solution.cpp"
+    file_ext = "cpp" if language == "C++" else "py"
+    dest_path = work_dir / f"solution.{file_ext}"
 
     # Only copy if the source and destination are not the same file.
     # We use .resolve() to get the absolute, canonical path, which correctly
@@ -169,7 +170,9 @@ def run_test_suite(solution_path: str, test_cases_dir: Path, time_limit: float, 
     (work_dir / "runner.sh").write_text(runner_sh_content, newline='\n')
     os.chmod(work_dir / "runner.sh", 0o755)
 
-    command = f"./runner.sh execute_suite {time_limit} {memory_limit} {run_full_suite} solution.cpp solution_executable"
+    solution_file = f"solution.{file_ext}"
+    executable_name = "solution_executable" if language == "C++" else "solution.py"
+    command = f"./runner.sh execute_suite {time_limit} {memory_limit} {run_full_suite} {solution_file} {executable_name} {language}"
     status_code, stdout, stderr = _run_command_in_container(DOCKER_IMAGE_TAG, command, work_dir=work_dir)
     
     if status_code != 0:

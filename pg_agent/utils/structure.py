@@ -124,6 +124,18 @@ class ProblemPaths:
         """
         return version_key.replace("Version", "")
 
+    def get_bruteforce_solution_path(self, language: str = "C++") -> Path:
+        """Gets the bruteforce solution path with appropriate file extension.
+        
+        Args:
+            language: Programming language (C++ or Python)
+            
+        Returns:
+            Path to the bruteforce solution file
+        """
+        file_ext = "cpp" if language == "C++" else "py"
+        return self.root / f"solution_bf.{file_ext}"
+
 def get_default_problem_dir() -> Optional[str]:
     """Get the default problem directory from settings."""
     settings_path = Path(__file__).parent.parent.parent / "pg_agent_settings.json"

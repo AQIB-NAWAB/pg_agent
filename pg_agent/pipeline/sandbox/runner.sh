@@ -19,18 +19,49 @@ elif [ "$MODE" = "execute_suite" ]; then
     RUN_FULL_SUITE=$4
     SOLUTION_FILE=$5
     EXECUTABLE_NAME=$6
+    LANGUAGE=${7:-"C++"}  # Default to C++ if not provided
 
-    g++ -std=c++20 -O2 -w -o "${EXECUTABLE_NAME}" "${SOLUTION_FILE}" 2> compilation_error.log
-    compile_exit_code=$?
-    
-    if [ $compile_exit_code -ne 0 ]; then
+    if [ "$LANGUAGE" = "C++" ]; then
+        g++ -std=c++20 -O2 -w -o "${EXECUTABLE_NAME}" "${SOLUTION_FILE}" 2> compilation_error.log
+        compile_exit_code=$?
+        
+        if [ $compile_exit_code -ne 0 ]; then
+            echo "COMPILATION_FAILED"
+            echo "ERROR_LOG_START"
+            cat compilation_error.log
+            echo "ERROR_LOG_END"
+            exit 0
+        fi
+        echo "COMPILATION_SUCCESS"
+    elif [ "$LANGUAGE" = "Python" ]; then
+        # For Python, just check if the file exists and is valid
+        if [ ! -f "${SOLUTION_FILE}" ]; then
+            echo "COMPILATION_FAILED"
+            echo "ERROR_LOG_START"
+            echo "Python file not found: ${SOLUTION_FILE}"
+            echo "ERROR_LOG_END"
+            exit 0
+        fi
+        
+        # Basic syntax check
+        python3 -m py_compile "${SOLUTION_FILE}" 2> compilation_error.log
+        compile_exit_code=$?
+        
+        if [ $compile_exit_code -ne 0 ]; then
+            echo "COMPILATION_FAILED"
+            echo "ERROR_LOG_START"
+            cat compilation_error.log
+            echo "ERROR_LOG_END"
+            exit 0
+        fi
+        echo "COMPILATION_SUCCESS"
+    else
         echo "COMPILATION_FAILED"
         echo "ERROR_LOG_START"
-        cat compilation_error.log
+        echo "Unsupported language: ${LANGUAGE}"
         echo "ERROR_LOG_END"
         exit 0
     fi
-    echo "COMPILATION_SUCCESS"
 
     if ! ls -d ./*.in > /dev/null 2>&1; then
         exit 0
@@ -53,7 +84,11 @@ elif [ "$MODE" = "execute_suite" ]; then
         outfile="${casenum}.out"
         prof_file="${casenum}.prof"
 
-        /usr/bin/time -o "${prof_file}" -f "TIME:%e MEM:%M" timeout "$TIME_LIMIT" ./"${EXECUTABLE_NAME}" < "$infile" > "$outfile"
+        if [ "$LANGUAGE" = "C++" ]; then
+            /usr/bin/time -o "${prof_file}" -f "TIME:%e MEM:%M" timeout "$TIME_LIMIT" ./"${EXECUTABLE_NAME}" < "$infile" > "$outfile"
+        elif [ "$LANGUAGE" = "Python" ]; then
+            /usr/bin/time -o "${prof_file}" -f "TIME:%e MEM:%M" timeout "$TIME_LIMIT" python3 "${SOLUTION_FILE}" < "$infile" > "$outfile"
+        fi
         exit_code=$?
         
         # Write the captured exit code into the profile file

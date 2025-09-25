@@ -14,7 +14,7 @@ from pg_agent.nodes.bruteforce_nodes import (
 from pg_agent.utils.logging import setup_logging, get_log_level
 from pg_agent.utils.structure import get_default_problem_dir, get_problem_paths
 from pg_agent.utils.models import get_llm
-from pg_agent.utils.env import get_available_models, default_model, load_env
+from pg_agent.utils.env import get_available_models, default_model, load_env, get_settings
 
 def build_bruteforce_graph() -> StateGraph:
     """Builds the graph for generating and refining bruteforce solutions."""
@@ -83,6 +83,11 @@ def main():
     model_config = load_env(model=args.model)
     llm = get_llm(model_config)
 
+    # Load language setting from global settings
+    settings = get_settings()
+    language = settings.get("language", "C++")
+    logger.info(f"Using language: {language}")
+
     # Prepare initial state
     initial_state: BruteForceState = {
         "problem_dir_path": str(problem_dir),
@@ -94,7 +99,8 @@ def main():
         "human_feedback": args.refine if args.refine is not None else None,
         "final_verdict": None,
         "final_bruteforce_path": None,
-        "llm": llm  
+        "llm": llm,
+        "language": language
     }
 
     # Run the workflow

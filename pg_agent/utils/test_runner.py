@@ -171,19 +171,21 @@ def run_tests(
     time_limit: float = 5.0,
     run_full_suite: bool = False,
     memory_limit: int = 512,
-    cpu_limit: str = "1.5"
+    cpu_limit: str = "1.5",
+    language: str = "C++"
 ) -> Dict:
     """
     Uses the sandbox_utils.run_test_suite helper to execute tests and then
     parses the output files to create a detailed report.
 
     Args:
-        solution_code: The C++ solution code to test
+        solution_code: The solution code to test (C++ or Python)
         test_cases: List of test cases, each with 'input', 'output' and 'name' fields
         time_limit: Time limit in seconds for each test case
         run_full_suite: If True, run all tests even after a failure
         memory_limit: Memory limit in MB
         cpu_limit: CPU limit for Docker container
+        language: Programming language ("C++" or "Python")
 
     Returns:
         Dict containing:
@@ -210,7 +212,11 @@ def run_tests(
     with tempfile.TemporaryDirectory() as temp_dir:
         work_dir = Path(temp_dir)
         
-        (work_dir / "solution.cpp").write_text(solution_code, encoding="utf-8")
+        # Choose the appropriate file extension based on language
+        file_ext = "cpp" if language == "C++" else "py"
+        solution_file = work_dir / f"solution.{file_ext}"
+        solution_file.write_text(solution_code, encoding="utf-8")
+        
         for tc in test_cases:
             (work_dir / tc["name"]).write_text(tc["input"], encoding="utf-8")
         
@@ -218,11 +224,12 @@ def run_tests(
             # Call the existing helper function to run the Docker container.
             # This function is responsible for creating the .out and .prof files.
             stdout, stderr = run_test_suite(
-                solution_path=str(work_dir / "solution.cpp"),
+                solution_path=str(solution_file),
                 test_cases_dir=work_dir,
                 time_limit=time_limit,
                 memory_limit=memory_limit,
-                run_full_suite=run_full_suite
+                run_full_suite=run_full_suite,
+                language=language
             )
         except Exception as e:
             # If run_test_suite throws an exception, it's likely a Docker error.

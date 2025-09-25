@@ -30,6 +30,7 @@ class BruteForceState(TypedDict):
     final_bruteforce_path: Optional[str]  # Path to the final saved solution
     llm_model: Optional[str]  
     llm: Any
+    language: Optional[str]  # Programming language to use (C++ or Python)
     
 def load_problem_statement_node(state: BruteForceState) -> BruteForceState:
     """Loads the problem statement and example test cases."""
@@ -42,19 +43,23 @@ def load_problem_statement_node(state: BruteForceState) -> BruteForceState:
     test_cases_dir = problem_dir / "test_cases"
     examples = find_test_cases(test_cases_dir, small_test_cases=True)
 
+    assert state.get("language") is not None, "Language is not set"
+
     print(f"Loaded problem statement and {len(examples)} example test cases.")
     return {
         **state,
         "problem_statement": problem_statement,
-        "example_test_cases": examples
+        "example_test_cases": examples,
+        "language": language
     }
 
-def _load_previous_solution(problem_dir: Path, version: int) -> str:
+def _load_previous_solution(problem_dir: Path, version: int, language: str = "C++") -> str:
     """Load the previous bruteforce solution code.
     
     Args:
         problem_dir: Path to the problem directory
         version: Current version number (will load version-1)
+        language: Programming language (C++ or Python)
         
     Returns:
         Previous solution code or None if not found
@@ -63,7 +68,8 @@ def _load_previous_solution(problem_dir: Path, version: int) -> str:
         return None
         
     prev_version = version - 1
-    solution_path = problem_dir / "automation" / "bruteForceSol" / f"bruteforceSolution_v{prev_version}.cpp"
+    file_ext = "cpp" if language == "C++" else "py"
+    solution_path = problem_dir / "automation" / "bruteForceSol" / f"bruteforceSolution_v{prev_version}.{file_ext}"
     
     if solution_path.exists():
         return solution_path.read_text(encoding="utf-8")
@@ -82,12 +88,16 @@ def generate_or_refine_bruteforce_node(state: BruteForceState) -> BruteForceStat
     prompt_template = prompt_path.read_text(encoding="utf-8")
     
     # Prepare prompt variables
-    variables = {"problem_statement": state["problem_statement"]}
+    language = state.get("language", "C++")
+    variables = {
+        "problem_statement": state["problem_statement"],
+        "language": language
+    }
     
     if is_refinement:
         # Load previous solution
         problem_dir = Path(state['problem_dir_path'])
-        previous_code = _load_previous_solution(problem_dir, state.get("iteration_count", 0))
+        previous_code = _load_previous_solution(problem_dir, state.get("iteration_count", 0), language)
         if previous_code is None:
             raise ValueError("No previous solution found for refinement")
         print("Loaded previous solution for refinement")
@@ -123,14 +133,20 @@ def generate_or_refine_bruteforce_node(state: BruteForceState) -> BruteForceStat
     chain = prompt | llm
     response = chain.invoke(variables)
 
-    # Extract code from response
-    code_match = re.search(r'```(?:cpp)?\s*([\s\S]+?)\s*```', response.content)
+    # Extract code from response based on language
+    language_regex = {
+        "C++": r'```(?:cpp|c\+\+)?\s*([\s\S]+?)\s*```',
+        "Python": r'```(?:python|py)?\s*([\s\S]+?)\s*```'
+    }
+    
+    pattern = language_regex.get(language, r'```(?:cpp|python|py|c\+\+)?\s*([\s\S]+?)\s*```')
+    code_match = re.search(pattern, response.content)
     code = code_match.group(1).strip() if code_match else response.content.strip()
     
     # Save the solution
     problem_dir = Path(state['problem_dir_path'])
     iteration = state.get("iteration_count", 0)
-    solution_path = _save_bruteforce_solution(problem_dir, code, iteration)
+    solution_path = _save_bruteforce_solution(problem_dir, code, iteration, language)
     print(f"Saved solution version {iteration} to: {solution_path}")
     
     return {
@@ -153,9 +169,11 @@ def test_bruteforce_node(state: BruteForceState) -> BruteForceState:
         return {**state, "test_failures": [], "final_verdict": "SUCCESS"}
 
     # Run tests to get the detailed report object
+    language = state.get("language")
     test_report = run_tests(
         solution_code=state["bruteforce_code"],
-        test_cases=state["example_test_cases"]
+        test_cases=state["example_test_cases"],
+        language=language
     )
     
     # Add code and test path to the main report 
@@ -189,17 +207,20 @@ def test_bruteforce_node(state: BruteForceState) -> BruteForceState:
         return {**state, "test_failures": failed_cases, "final_verdict": None}
     else:
         print("--- All examples PASSED. ---")
-        paths.bruteforce_solution.write_text(state["bruteforce_code"], encoding="utf-8")
-        print(f"Copied successful solution to: {paths.bruteforce_solution}")
+        language = state.get("language", "C++")
+        bruteforce_path = paths.get_bruteforce_solution_path(language)
+        bruteforce_path.write_text(state["bruteforce_code"], encoding="utf-8")
+        print(f"Copied successful solution to: {bruteforce_path}")
         return {**state, "test_failures": [], "final_verdict": "SUCCESS"}
 
-def _save_bruteforce_solution(problem_dir: Path, solution_code: str, version: int) -> Path:
+def _save_bruteforce_solution(problem_dir: Path, solution_code: str, version: int, language: str = "C++") -> Path:
     """Saves the bruteforce solution with specified version number.
     
     Args:
         problem_dir: Path to the problem directory
-        solution_code: The C++ solution code to save
+        solution_code: The solution code to save
         version: Version number to use for the file
+        language: Programming language (C++ or Python)
         
     Returns:
         Path where the solution was saved
@@ -207,10 +228,11 @@ def _save_bruteforce_solution(problem_dir: Path, solution_code: str, version: in
     automation_dir = problem_dir / "automation"
     automation_dir.mkdir(exist_ok=True)
     
-    # Save solution
+    # Save solution with appropriate file extension
     bf_dir = automation_dir / "bruteForceSol"
     bf_dir.mkdir(parents=True, exist_ok=True)
-    solution_path = bf_dir / f"bruteforceSolution_v{version}.cpp"
+    file_ext = "cpp" if language == "C++" else "py"
+    solution_path = bf_dir / f"bruteforceSolution_v{version}.{file_ext}"
     solution_path.write_text(solution_code, encoding="utf-8")
     
     # Update settings

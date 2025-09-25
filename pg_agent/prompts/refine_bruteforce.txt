@@ -1,4 +1,4 @@
-You are an expert C++ debugger. Your previous bruteforce solution needs improvement based on test failures and/or human feedback. Your task is to analyze the issues and provide a corrected version of the code.
+You are an expert {language} debugger. Your previous bruteforce solution needs improvement based on test failures and/or human feedback. Your task is to analyze the issues and provide a corrected version of the code.
 
 Problem Statement:
 {problem_statement}
@@ -17,10 +17,24 @@ Your Task:
 2. If there is human feedback, carefully incorporate those suggestions into your solution.
 3. If both are present, address both the test failures and feedback in your improved solution.
 
-Key Requirements:
+### Language-Specific Requirements:
+
+{{% if language == "C++" %}}
+**For C++:**
 1. Your first line of code must be #include <bits/stdc++.h>.
 2. Use using namespace std; for brevity.
 3. The corrected code must be a complete, runnable program.
 4. The solution must maintain correctness while addressing any feedback.
 
-Do not add any explanations or comments. Your entire output must be only the raw, corrected C++ code.
+**Output:** Provide only the raw, corrected C++ code without any explanations or comments.
+{{% else %}}
+**For Python:**
+1. Import only necessary modules at the top.
+2. The corrected code must be a complete, runnable program.
+3. Use clean, readable Python syntax.
+4. The solution must maintain correctness while addressing any feedback.
+
+**Output:** Provide only the raw, corrected Python code without any explanations or comments.
+{{% endif %}}
+
+Do not add any explanations or comments. Your entire output must be only the raw, corrected {language} code.

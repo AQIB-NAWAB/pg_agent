@@ -22,7 +22,8 @@ dependencies = [
     "questionary>=2.1.0",
     "langchain-fireworks>=0.0.1",
     "volcengine-python-sdk>=4.0",
-    "langchain-google-genai>=2.1.0"
+    "langchain-google-genai>=2.1.0",
+    "protobuf>=5.29.5"
 ]
 
 [project.optional-dependencies]

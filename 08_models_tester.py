@@ -226,15 +226,7 @@ def print_terminal_summary(report_data: dict):
 
 
 def main():
-    # Load language setting from global settings
-    settings = get_settings()
-    language = settings.get("language", "C++")
-    
-    # Set language-specific constants
-    file_ext = "cpp" if language == "C++" else "py"
-    special_solutions = [f"solution_bf.{file_ext}", f"standard.{file_ext}"]
-    
-    parser = argparse.ArgumentParser(description=f"Generate and/or test external {language} model solutions.")
+    parser = argparse.ArgumentParser(description="Generate and/or test external model solutions.")
     parser.add_argument("problem_dir", type=str, nargs="?", default=get_default_problem_dir(), help="Path to the problem directory.")
     # Generation flags
     parser.add_argument("--generate", action="store_true", help="Enable the solution generation phase.")
@@ -248,6 +240,8 @@ def main():
     parser.add_argument("--time-limit", type=float, default=5.0, help="Time limit in seconds for each test case.")
     parser.add_argument("--memory", type=int, default=512, help="Memory limit for Docker (e.g., '256m').")
     parser.add_argument("--cpus", type=str, default="1.5", help="CPU limit for Docker (e.g., '1.5').")
+    parser.add_argument("-l", "--language", type=str, choices=["C++", "Python", "default"], default="default",
+                        help="Programming language to use: C++, Python, or default (from settings) (default: default)")
     
     args = parser.parse_args()
 
@@ -255,7 +249,18 @@ def main():
     setup_logging()
     logger = logging.getLogger(__name__)
     
-    logger.info(f"Using language: {language}")
+    # Determine language to use
+    if args.language == "default":
+        settings = get_settings()
+        language = settings.get("language", "C++")
+        logger.info(f"Using language from settings: {language}")
+    else:
+        language = args.language
+        logger.info(f"Using language from command line: {language}")
+    
+    # Set language-specific constants
+    file_ext = "cpp" if language == "C++" else "py"
+    special_solutions = [f"solution_bf.{file_ext}", f"standard.{file_ext}"]
 
     if not args.generate:
         logger.info("No generation requested. Proceeding with testing only.")

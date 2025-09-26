@@ -70,6 +70,9 @@ def main():
     parser.add_argument("--use-opt-only", action="store_true",
                        help="Use only optimal solution (standard.cpp) for output generation")
     
+    parser.add_argument("-l", "--language", type=str, choices=["C++", "Python", "default"], default="default",
+                       help="Programming language to use: C++, Python, or default (from settings) (default: default)")
+    
     # Add logging control arguments
     parser.add_argument("--log-level", type=str, default="info",
                        choices=['debug', 'info', 'warning', 'error', 'critical'],
@@ -92,10 +95,14 @@ def main():
     if not args.problem_dir:
         parser.error("No problem directory specified and could not read default from settings")
 
-    # Load language setting from global settings
-    settings = get_settings()
-    language = settings.get("language", "C++")
-    logger.info(f"Using language: {language}")
+    # Determine language to use
+    if args.language == "default":
+        settings = get_settings()
+        language = settings.get("language", "C++")
+        logger.info(f"Using language from settings: {language}")
+    else:
+        language = args.language
+        logger.info(f"Using language from command line: {language}")
     
     # Get problem paths and validate required files exist
     paths = get_problem_paths(args.problem_dir)

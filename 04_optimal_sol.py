@@ -50,6 +50,8 @@ def main():
                         help="Refine previous solution. Optionally provide feedback for improvement.")
     parser.add_argument("--time-limit", type=float, default=5,
                         help="Time limit for solution execution in seconds (default: 5)")
+    parser.add_argument("-l", "--language", type=str, choices=["C++", "Python", "default"], default="default",
+                        help="Programming language to use: C++, Python, or default (from settings) (default: default)")
     parser.add_argument("--log-level", type=str, default="info",
                         choices=['debug', 'info', 'warning', 'error', 'critical'],
                         help="Set the logging level (default: info)")
@@ -93,10 +95,14 @@ def main():
     model_config = load_env(model=args.model)
     llm = get_llm(model_config)
 
-    # Load language setting from global settings
-    settings = get_settings()
-    language = settings.get("language", "C++")
-    logger.info(f"Using language: {language}")
+    # Determine language to use
+    if args.language == "default":
+        settings = get_settings()
+        language = settings.get("language", "C++")
+        logger.info(f"Using language from settings: {language}")
+    else:
+        language = args.language
+        logger.info(f"Using language from command line: {language}")
 
     # Prepare initial state
     initial_state: OptimalSolutionState = {

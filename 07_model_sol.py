@@ -311,12 +311,7 @@ def main():
     available_models = get_available_models("model_sol")
     default_model_name = default_model("model_sol")
     
-    # Load language setting from global settings
-    settings = get_settings()
-    language = settings.get("language", "C++")
-    
-    language_desc = "C++" if language == "C++" else "Python"
-    parser = argparse.ArgumentParser(description=f"Generate {language_desc} solutions using Qwen, Doubao, Tencent, etc.")
+    parser = argparse.ArgumentParser(description="Generate AI model solutions using Qwen, Doubao, Tencent, etc.")
     parser.add_argument("problem_dir", nargs="?", default=default_dir,
                         help=f"Path to problem directory (default: {default_dir})")
     parser.add_argument("--num", type=int, default=1,
@@ -325,6 +320,8 @@ def main():
                         help="LLM provider for model (use 'default' to use model's default provider)")
     parser.add_argument("--model", nargs='+', default=[default_model_name],
                         help=f"Choose model(s) to use. Can be a single model or multiple models separated by spaces or commas. Available: {', '.join(available_models)}")
+    parser.add_argument("-l", "--language", type=str, choices=["C++", "Python", "default"], default="default",
+                        help="Programming language to use: C++, Python, or default (from settings) (default: default)")
     parser.add_argument("--log-level", type=str, default="debug",
                         choices=['debug', 'info', 'warning', 'error', 'critical'],
                         help="Set the logging level (default: debug)")
@@ -354,6 +351,15 @@ def main():
         logger.info("Log file: %s", log_file)
 
     try:
+        # Determine language to use
+        if args.language == "default":
+            settings = get_settings()
+            language = settings.get("language", "C++")
+            logger.info("🚀 Using language from settings: %s", language)
+        else:
+            language = args.language
+            logger.info("🚀 Using language from command line: %s", language)
+        
         # Parse model names
         model_names = parse_models(args.model)
         
@@ -364,7 +370,6 @@ def main():
                            model_name, ", ".join(available_models))
                 sys.exit(1)
         
-        logger.info("🚀 Using language: %s", language)
         logger.info("🚀 Generating %d %s solution(s) per model for: %s", 
                    args.num, language, ", ".join(model_names))
         

@@ -116,6 +116,9 @@ Examples:
     parser.add_argument("--refine", metavar="FEEDBACK",
                         help="Refine existing generator/validator with the provided feedback")
     
+    parser.add_argument("-l", "--language", type=str, choices=["C++", "Python", "default"], default="default",
+                        help="Programming language to use: C++, Python, or default (from settings) (default: default)")
+    
     # Add logging control arguments
     parser.add_argument("--log-level", type=str, default="info",
                         choices=['debug', 'info', 'warning', 'error', 'critical'],
@@ -150,10 +153,14 @@ Examples:
         logger.error("Error: automation_settings.json not found. Please run bruteforce generator first.")
         sys.exit(1)
     
-    # Load language setting from global settings
-    settings = get_settings()
-    language = settings.get("language", "C++")
-    logger.info(f"Using language: {language}")
+    # Determine language to use
+    if args.language == "default":
+        settings = get_settings()
+        language = settings.get("language", "C++")
+        logger.info(f"Using language from settings: {language}")
+    else:
+        language = args.language
+        logger.info(f"Using language from command line: {language}")
     
     # If exec-only mode is enabled, check that required generators exist
     if args.exec_only:

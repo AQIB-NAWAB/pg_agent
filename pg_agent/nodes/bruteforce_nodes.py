@@ -49,8 +49,7 @@ def load_problem_statement_node(state: BruteForceState) -> BruteForceState:
     return {
         **state,
         "problem_statement": problem_statement,
-        "example_test_cases": examples,
-        "language": language
+        "example_test_cases": examples
     }
 
 def _load_previous_solution(problem_dir: Path, version: int, language: str = "C++") -> str:

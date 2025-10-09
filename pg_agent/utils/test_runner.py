@@ -8,6 +8,46 @@ from ..pipeline.sandbox.sandbox_utils import run_test_suite
 
 logger = logging.getLogger(__name__)
 
+def normalize_output(output: str) -> str:
+    """Normalize output for comparison by handling whitespace similar to diff -w.
+    
+    This function:
+    - Normalizes different newline formats (\r\n, \r, \n) to \n
+    - Strips leading and trailing whitespace from the entire string
+    - Strips leading and trailing whitespace from each line
+    - Removes empty lines at the beginning and end
+    - Normalizes internal whitespace (multiple spaces/tabs become single space)
+    
+    Args:
+        output: The output string to normalize
+        
+    Returns:
+        Normalized output string
+    """
+    if not output:
+        return ""
+    
+    # First normalize newlines (\r\n and \r to \n)
+    # output = output.replace('\r\n', '\n').replace('\r', '\n')
+    
+    # Split into lines and normalize each line
+    lines = []
+    for line in output.splitlines():
+        # Strip leading/trailing whitespace from each line
+        normalized_line = line.strip()
+        # Normalize internal whitespace (multiple spaces/tabs become single space)
+        normalized_line = re.sub(r'\s+', ' ', normalized_line)
+        lines.append(normalized_line)
+    
+    # Remove empty lines from beginning and end
+    # while lines and not lines[0]:
+    #     lines.pop(0)
+    # while lines and not lines[-1]:
+    #     lines.pop()
+    
+    # Join lines back with single newlines
+    return '\n'.join(lines)
+
 def natural_sort_key(s):
     """Key function for natural sorting of numeric filenames."""
     s = str(s)
@@ -117,7 +157,7 @@ def find_test_cases(test_cases_dir: Path, small_test_cases: bool = False) -> Lis
     for in_file, out_file in all_pairs:
         test_cases.append({
             "input": in_file.read_text(encoding="utf-8"),
-            "output": out_file.read_text(encoding="utf-8").strip(),
+            "output": out_file.read_text(encoding="utf-8"),
             "name": in_file.name
         })
     
@@ -277,17 +317,18 @@ def run_tests(
             if not out_file.exists():
                 status = "RUNTIME_ERROR"
             else:
-                actual_stdout = out_file.read_text(encoding="utf-8").strip()
-                expected_output = tc_map[test_name]["output"].strip()
+                actual_stdout = out_file.read_text(encoding="utf-8")
+                stripped_actual_stdout = actual_stdout.strip()
+                expected_output = tc_map[test_name]["output"]
                 
                 # Convert memory limit to KB
                 memory_limit_kb = memory_limit * 1024
                 
                 if mem_kb > memory_limit_kb:
                     status = "MEMORY_LIMIT_EXCEEDED"
-                elif actual_stdout == "TIMEOUT":
+                elif stripped_actual_stdout == "TIMEOUT":
                     status = "TIME_LIMIT_EXCEEDED"
-                elif actual_stdout == "RUNTIME_ERROR":
+                elif stripped_actual_stdout == "RUNTIME_ERROR":
                      if exit_code > 128:
                         signal = exit_code - 128
                         if signal == 11: status = "SIGSEGV"
@@ -295,7 +336,7 @@ def run_tests(
                         else: status = f"RTE(Signal {signal})"
                      else:
                         status = "NZEC"
-                elif actual_stdout == expected_output:
+                elif normalize_output(actual_stdout) == normalize_output(expected_output):
                     status = "PASSED"
                 else:
                     status = "WRONG_ANSWER"

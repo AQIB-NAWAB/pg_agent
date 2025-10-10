@@ -384,8 +384,17 @@ def extract_standard_from_solution(solution_path: Path, language: str = "C++", l
             logger.error(f"No {language} code blocks found in solution.md")
             return False
         
-        # Get the last matching code block
-        last_code_block = matching_blocks[-1]
+        # Get the last code block with more than 10 lines, or the last one if none meet the criteria
+        last_code_block = None
+        for block in reversed(matching_blocks):
+            lines = block.strip().split('\n')
+            if len(lines) > 10:
+                last_code_block = block
+                break
+        
+        # If no block has more than 10 lines, use the last one
+        if last_code_block is None:
+            last_code_block = matching_blocks[-1]
         
         # Save to standard.{ext}
         standard_path = solution_path.parent / f"standard.{file_ext}"
@@ -447,6 +456,102 @@ def extract_examples_from_test_cases(problem_dir: Path, logger: logging.Logger) 
         logger.debug(f"No examples found in test_cases directory")
     
     return examples
+
+
+def find_test_cases_by_pattern(test_cases_dir: Path, pattern: str) -> List[Tuple[Path, Path]]:
+    """Find test case pairs matching a pattern."""
+    pairs = []
+    for in_file in sorted(test_cases_dir.glob(pattern)):
+        out_file = in_file.with_suffix('.out')
+        if out_file.exists():
+            pairs.append((in_file, out_file))
+    return pairs
+
+
+def remove_duplicate_test_cases(problem_dir: Path, logger: logging.Logger) -> bool:
+    """Remove duplicate test cases based on find_test_cases search order."""
+    try:
+        test_cases_dir = problem_dir / 'test_cases'
+        
+        if not test_cases_dir.exists():
+            logger.warning(f"No test_cases directory found in {problem_dir.name}")
+            return False
+        
+        # Find all test case pairs in the order they would be searched by find_test_cases
+        all_pairs = []
+        
+        # 1. Example test cases (highest priority)
+        example_pairs = find_test_cases_by_pattern(test_cases_dir, "example_*.in")
+        all_pairs.extend(example_pairs)
+        
+        # 2. Small test cases
+        small_test_pairs = find_test_cases_by_pattern(test_cases_dir, "test_[0-9]*.in")
+        small_test_pairs_2 = find_test_cases_by_pattern(test_cases_dir, "test_small_[0-9]*.in")
+        small_test_pairs.extend(small_test_pairs_2)
+        all_pairs.extend(small_test_pairs)
+        
+        # 3. Medium test cases
+        medium_test_pairs = find_test_cases_by_pattern(test_cases_dir, "test_medium_[0-9]*.in")
+        all_pairs.extend(medium_test_pairs)
+        
+        # 4. Large test cases
+        large_test_pairs = find_test_cases_by_pattern(test_cases_dir, "test_large_[0-9]*.in")
+        all_pairs.extend(large_test_pairs)
+        
+        # 5. Edge test cases
+        edge_test_pairs = find_test_cases_by_pattern(test_cases_dir, "test_edge_[0-9]*.in")
+        all_pairs.extend(edge_test_pairs)
+        
+        # 6. Numbered test cases (lowest priority)
+        numbered_pairs = find_test_cases_by_pattern(test_cases_dir, "[0-9]*.in")
+        all_pairs.extend(numbered_pairs)
+        
+        # Track content to detect duplicates
+        seen_content = {}
+        duplicates_removed = []
+        
+        for in_file, out_file in all_pairs:
+            try:
+                # Read input and output content
+                input_content = in_file.read_text(encoding='utf-8').strip()
+                output_content = out_file.read_text(encoding='utf-8').strip()
+                
+                # Create a key for content comparison
+                content_key = (input_content, output_content)
+                
+                if content_key in seen_content:
+                    # This is a duplicate - remove the later one (current file)
+                    original_file = seen_content[content_key]
+                    logger.info(f"Removing duplicate test case: {in_file.name} (same as {original_file})")
+                    
+                    # Remove both .in and .out files
+                    in_file.unlink()
+                    out_file.unlink()
+                    
+                    duplicates_removed.append(f"{in_file.name} (same as {original_file})")
+                    print(f"🗑️  Removed: {in_file.name} (duplicate of {original_file})")
+                else:
+                    # First time seeing this content - keep it
+                    seen_content[content_key] = in_file.name
+                    
+            except Exception as e:
+                logger.warning(f"Error processing test case {in_file.name}: {e}")
+                continue
+        
+        if duplicates_removed:
+            logger.info(f"Removed {len(duplicates_removed)} duplicate test cases:")
+            for duplicate in duplicates_removed:
+                logger.info(f"  - {duplicate}")
+            print(f"✅ Removed {len(duplicates_removed)} duplicate test cases")
+            return True
+        else:
+            logger.info(f"No duplicate test cases found in {problem_dir.name}")
+            print(f"ℹ️  No duplicate test cases found in {problem_dir.name}")
+            return True
+            
+    except Exception as e:
+        logger.error(f"Error removing duplicate test cases for {problem_dir.name}: {e}")
+        return False
 
 
 def update_metadata_json(problem_dir: Path, notebook_metadata: Dict, logger: logging.Logger) -> bool:
@@ -688,6 +793,8 @@ def main():
                        help="Extract solution from notebook")
     parser.add_argument("--extract-standard", action="store_true", 
                        help="Extract standard code from solution.md")
+    parser.add_argument("--rem-dup-tests", action="store_true",
+                       help="Remove duplicate test cases based on find_test_cases search order")
     
     # Language option
     parser.add_argument("-l", "--language", type=str, choices=["C++", "Python", "default"], default="default",
@@ -742,15 +849,8 @@ def main():
             print(f"❌ Problem directory not found: {problem_dir}")
             sys.exit(1)
         
-        # Find notebook in problem directory
-        notebook_path = find_notebook_in_problem_dir(problem_dir)
-        if not notebook_path:
-            print(f"❌ No Jupyter notebook found in {problem_dir}")
-            sys.exit(1)
-        print(f"📓 Found notebook: {notebook_path}")
-    
     # Determine which extractions to perform
-    if not any([args.extract_meta, args.extract_problem, args.extract_solution, args.extract_standard]):
+    if not any([args.extract_meta, args.extract_problem, args.extract_solution, args.extract_standard, args.rem_dup_tests]):
         # If no specific extractions requested, perform all
         extract_meta = True
         extract_problem = True
@@ -762,13 +862,26 @@ def main():
         extract_problem = args.extract_problem
         extract_solution = args.extract_solution
         extract_standard = args.extract_standard
+        rem_dup_tests = args.rem_dup_tests
+    
+    # Find notebook in problem directory (only if we need it for other operations)
+    notebook_path = None
+    if any([extract_meta, extract_problem, extract_solution]):
+        notebook_path = find_notebook_in_problem_dir(problem_dir)
+        if not notebook_path:
+            print(f"❌ No Jupyter notebook found in {problem_dir}")
+            sys.exit(1)
+        print(f"📓 Found notebook: {notebook_path}")
+    else:
+        print(f"📁 Using problem directory: {problem_dir}")
     
     # Track results
     results = {
         'metadata': False,
         'problem_statement': False,
         'solution': False,
-        'standard': False
+        'standard': False,
+        'rem_dup_tests': False
     }
     
     print(f"🔧 Processing: {problem_dir.name}")
@@ -777,34 +890,46 @@ def main():
     
     # Extract metadata if requested
     if extract_meta:
-        print("📊 Extracting metadata...", end=" ")
-        notebook_metadata = parse_metadata_from_notebook(notebook_path, logger)
-        
-        if update_metadata_json(problem_dir, notebook_metadata, logger):
-            results['metadata'] = True
-            print("✅")
+        if notebook_path is None:
+            print("❌ No notebook found for metadata extraction")
+            results['metadata'] = False
         else:
-            print("❌")
+            print("📊 Extracting metadata...", end=" ")
+            notebook_metadata = parse_metadata_from_notebook(notebook_path, logger)
+            
+            if update_metadata_json(problem_dir, notebook_metadata, logger):
+                results['metadata'] = True
+                print("✅")
+            else:
+                print("❌")
     
     # Extract problem statement if requested
     if extract_problem:
-        print("📄 Extracting problem statement...", end=" ")
-        prompt_content = extract_prompt_from_notebook(notebook_path, logger)
-        if save_prompt_to_problem_statement(problem_dir, prompt_content, logger):
-            results['problem_statement'] = True
-            print("✅")
+        if notebook_path is None:
+            print("❌ No notebook found for problem statement extraction")
+            results['problem_statement'] = False
         else:
-            print("❌")
+            print("📄 Extracting problem statement...", end=" ")
+            prompt_content = extract_prompt_from_notebook(notebook_path, logger)
+            if save_prompt_to_problem_statement(problem_dir, prompt_content, logger):
+                results['problem_statement'] = True
+                print("✅")
+            else:
+                print("❌")
     
     # Extract solution if requested
     if extract_solution:
-        print("💡 Extracting solution...", end=" ")
-        solution_content = extract_solution_from_notebook(notebook_path, logger)
-        if save_solution_to_file(problem_dir, solution_content, logger):
-            results['solution'] = True
-            print("✅")
+        if notebook_path is None:
+            print("❌ No notebook found for solution extraction")
+            results['solution'] = False
         else:
-            print("❌")
+            print("💡 Extracting solution...", end=" ")
+            solution_content = extract_solution_from_notebook(notebook_path, logger)
+            if save_solution_to_file(problem_dir, solution_content, logger):
+                results['solution'] = True
+                print("✅")
+            else:
+                print("❌")
     
     # Extract standard code if requested
     if extract_standard:
@@ -813,6 +938,14 @@ def main():
         if extract_standard_from_solution(solution_path, language, logger):
             results['standard'] = True
             print("✅")
+        else:
+            print("❌")
+    
+    # Remove duplicate test cases if requested
+    if rem_dup_tests:
+        print("🗑️  Removing duplicate test cases...")
+        if remove_duplicate_test_cases(problem_dir, logger):
+            results['rem_dup_tests'] = True
         else:
             print("❌")
     
@@ -826,6 +959,8 @@ def main():
         requested_extractions.append('solution')
     if extract_standard:
         requested_extractions.append('standard')
+    if rem_dup_tests:
+        requested_extractions.append('rem_dup_tests')
     
     # Check if all requested extractions succeeded
     all_requested_succeeded = all(results[extraction] for extraction in requested_extractions)

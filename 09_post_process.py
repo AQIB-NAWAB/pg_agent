@@ -544,37 +544,85 @@ def save_prompt_to_problem_statement(problem_dir: Path, prompt_content: str, log
         
         problem_statement_path = problem_dir / 'problem_statement.md'
         
-        # Look for "Time limit:" or "**Time limit:" and remove everything before it
-        time_limit_match = re.search(r'(?:\*\*)?Time [Ll]imit:(?:\*\*)?', prompt_content)
-        if time_limit_match:
-            # Remove everything before Time limit
-            content_from_time_limit = prompt_content[time_limit_match.start():]
-        else:
-            # No Time limit found, use the whole content
-            content_from_time_limit = prompt_content
+        # Remove **[Prompt]** header if found at the beginning
+        prompt_content = re.sub(r'^\s*\*\*\[Prompt\]\*\*\s*\n?', '', prompt_content, flags=re.MULTILINE)
         
-        # Get title from problem_title.txt or problem_title.md
+        # 1. Get problem title from problem_title.md/txt
         problem_title_path = problem_dir / 'problem_title.txt'
         if not problem_title_path.exists():
             problem_title_path = problem_dir / 'problem_title.md'
         
+        file_title = None
         if problem_title_path.exists():
             try:
                 with open(problem_title_path, 'r', encoding='utf-8') as f:
-                    title = f.read().strip()
-                if title:
-                    # Remove any existing # from the title to avoid double headers
-                    if title.startswith('#'):
-                        title = title.lstrip('#').strip()
-                    # Add the title as a header at the beginning
-                    formatted_content = f"# {title}\n\n{content_from_time_limit}"
-                else:
-                    formatted_content = content_from_time_limit
+                    file_title = f.read().strip()
+                    # Remove any existing # from the title
+                    if file_title.startswith('#'):
+                        file_title = file_title.lstrip('#').strip()
             except Exception as e:
                 logger.warning(f"Could not read {problem_title_path.name} for {problem_dir.name}: {e}")
-                formatted_content = content_from_time_limit
+        
+        # 2. Check that time limit and space limit are specified
+        time_limit_match = re.search(r'(?:\*\*)?Time [Ll]imit:(?:\*\*)?', prompt_content)
+        space_limit_match = re.search(r'(?:\*\*)?Memory [Ll]imit:(?:\*\*)?', prompt_content)
+        
+        if not time_limit_match:
+            logger.warning(f"Time limit not found in prompt content for {problem_dir.name}")
+        if not space_limit_match:
+            logger.warning(f"Memory limit not found in prompt content for {problem_dir.name}")
+        
+        # 3. Check title formatting and consistency
+        if time_limit_match:
+            # Get content before and after time limit
+            title_content = prompt_content[:time_limit_match.start()].strip()
+            content_after_title = prompt_content[time_limit_match.start():]
         else:
-            formatted_content = content_from_time_limit
+            # No time limit found, search first few lines for title
+            lines = prompt_content.split('\n')[:5]  # Check first 5 lines
+            title_content = ""
+            content_after_title = prompt_content
+            
+            for i, line in enumerate(lines):
+                line = line.strip()
+                if line.startswith('#'):
+                    title_content = line
+                    content_after_title = '\n'.join(lines[i+1:]) + '\n' + '\n'.join(prompt_content.split('\n')[5:])
+                    break
+                elif line.startswith('**') and line.endswith('**'):
+                    title_content = line
+                    content_after_title = '\n'.join(lines[i+1:]) + '\n' + '\n'.join(prompt_content.split('\n')[5:])
+                    break
+        
+        # Check if title is properly formatted with # and matches file title
+        if file_title and title_content:
+            # Look for # title pattern in title content
+            title_match = re.search(r'^#\s*(.+)$', title_content, re.MULTILINE)
+            if title_match:
+                notebook_title = title_match.group(1).strip()
+                if notebook_title != file_title:
+                    logger.warning(f"Title mismatch for {problem_dir.name}: notebook has '{notebook_title}' but file has '{file_title}'")
+            else:
+                # Check for **title** pattern and warn about formatting
+                title_match = re.search(r'\*\*([^*]+?)\*\*', title_content)
+                if title_match:
+                    notebook_title = title_match.group(1).strip()
+                    if notebook_title == file_title:
+                        logger.warning(f"Title found but incorrectly formatted with ** for {problem_dir.name}, should use # format")
+                    else:
+                        logger.warning(f"Title mismatch and incorrect formatting for {problem_dir.name}: notebook has '{notebook_title}' but file has '{file_title}'")
+                else:
+                    logger.warning(f"No title found in content for {problem_dir.name}, expected '{file_title}'")
+        elif file_title and not title_content:
+            logger.warning(f"No title found in content for {problem_dir.name}, expected '{file_title}'")
+        
+        # 4. Format the final content with proper title
+        if file_title:
+            # Ensure title is properly formatted with # and has empty line after
+            formatted_content = f"# {file_title}\n\n{content_after_title}"
+        else:
+            # No file title, use content as-is
+            formatted_content = content_after_title
         
         # Write the formatted prompt content to problem_statement.md
         with open(problem_statement_path, 'w', encoding='utf-8') as f:

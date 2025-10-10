@@ -115,7 +115,18 @@ def parse_metadata_from_notebook(notebook_path: Path, logger: logging.Logger) ->
                                 subtopics = json.loads(json_value)
                                 metadata['subtopic'] = subtopics
                             elif field_value.startswith('[') and field_value.endswith(']'):
-                                subtopics = json.loads(field_value)
+                                # Handle case where items are not quoted (e.g., [item1, item2, item3])
+                                if '"' not in field_value and "'" not in field_value:
+                                    # Split by comma and clean up
+                                    items = [item.strip() for item in field_value[1:-1].split(',')]
+                                    metadata['subtopic'] = items
+                                else:
+                                    subtopics = json.loads(field_value)
+                                    metadata['subtopic'] = subtopics
+                            elif field_value.startswith('"[') and field_value.endswith(']"'):
+                                # Handle case where the array is wrapped in quotes
+                                inner_value = field_value[1:-1]  # Remove outer quotes
+                                subtopics = json.loads(inner_value)
                                 metadata['subtopic'] = subtopics
                             else:
                                 metadata['subtopic'] = [field_value]

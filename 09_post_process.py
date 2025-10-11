@@ -141,7 +141,7 @@ def parse_metadata_from_notebook(notebook_path: Path, logger: logging.Logger) ->
                         if isinstance(field_value, list):
                             approaches = field_value
                         elif isinstance(field_value, str):
-                            if '->' in field_value or ' to ' in field_value or r'\rightarrow' in field_value:
+                            if '->' in field_value or ' to ' in field_value or r'\rightarrow' in field_value or '→' in field_value:
                                 if '->' in field_value:
                                     approaches = [app.strip() for app in field_value.split('->')]
                                 elif ' to ' in field_value:
@@ -150,6 +150,8 @@ def parse_metadata_from_notebook(notebook_path: Path, logger: logging.Logger) ->
                                     approaches = [app.strip() for app in field_value.split(r'\\rightarrow')]
                                 elif r'\rightarrow' in field_value:
                                     approaches = [app.strip() for app in field_value.split(r'\rightarrow')]
+                                elif '→' in field_value:
+                                    approaches = [app.strip() for app in field_value.split('→')]
                                 else:
                                     approaches = [app.strip() for app in field_value.split(r'\to')]
                                 
@@ -176,8 +178,24 @@ def parse_metadata_from_notebook(notebook_path: Path, logger: logging.Logger) ->
                                     logger.warning(f"Approach {i} is not a string, converting to string")
                                     approach = str(approach)
                                 
-                                # Ensure proper LaTeX formatting with $ symbols
+                                # Clean up the approach formatting
                                 formatted_approach = approach.strip()
+                                
+                                # Remove leading ( if it appears before $ symbols
+                                if formatted_approach.startswith('(') and '$' in formatted_approach:
+                                    # Remove the leading parenthesis
+                                    formatted_approach = formatted_approach[1:].strip()
+                                
+                                # Remove trailing ) if it appears after $ symbols
+                                if formatted_approach.endswith(')') and '$' in formatted_approach:
+                                    # Remove the trailing parenthesis
+                                    formatted_approach = formatted_approach[:-1].strip()
+                                
+                                # Remove extra spaces around $ symbols
+                                # Remove space after opening $
+                                formatted_approach = re.sub(r'\$\s+', '$', formatted_approach)
+                                # Remove space before closing $
+                                formatted_approach = re.sub(r'\s+\$', '$', formatted_approach)
                                 
                                 # Count the number of $ symbols
                                 dollar_count = formatted_approach.count('$')
@@ -270,10 +288,10 @@ def extract_prompt_from_notebook(notebook_path: Path, logger: logging.Logger) ->
                 else:
                     prompt_lines.append(line)
             
-            prompt_content = '\n'.join(prompt_lines).strip()
+            prompt_content = '\n'.join(prompt_lines)
         else:
             # For time_limit or title patterns, use the cell content as-is
-            prompt_content = prompt_cell.strip()
+            prompt_content = prompt_cell
         
         logger.debug(f"Extracted prompt content ({len(prompt_content)} characters) using {prompt_cell_type} pattern")
         return prompt_content
@@ -856,6 +874,7 @@ def main():
         extract_problem = True
         extract_solution = True
         extract_standard = True
+        rem_dup_tests = True  # Remove duplicates by default
         print("📋 No specific extractions requested, performing all extractions")
     else:
         extract_meta = args.extract_meta

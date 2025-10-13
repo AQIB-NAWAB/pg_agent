@@ -206,6 +206,55 @@ python 08_models_tester.py ./problem/ --generate --all --num 3 --test
 
 For detailed documentation and all available options, see the script's help: `python 08_models_tester.py --help`
 
+### 3.9 Post-Process Notebooks (`09_post_process.py`)
+
+A tool for extracting structured data from Jupyter notebooks (typically from Colab) and processing them to create organized problem directories with metadata, problem statements, solutions, and standard code.
+
+**Key Features:**
+- Extract metadata from notebook cells and merge with `requirements.json`
+- Extract problem statements and save to `problem_statement.md`
+- Extract solutions and save to `solution.md`
+- Extract standard code from solutions and save to `standard.cpp` or `standard.py`
+- Remove duplicate test cases based on `find_test_cases` search order
+- Support for both C++ and Python languages
+- Automatic notebook discovery in problem directories
+
+**Usage Examples:**
+```bash
+# Process all extractions for a problem directory
+python 09_post_process.py ../problems/my_problem
+
+# Process specific notebook file
+python 09_post_process.py --nbook ../problems/my_problem/notebook.ipynb
+
+# Extract only metadata and problem statement
+python 09_post_process.py ../problems/my_problem --extract-meta --extract-problem
+
+# Extract solution and standard code for Python
+python 09_post_process.py ../problems/my_problem --extract-solution --extract-standard --language Python
+
+# Remove duplicate test cases only
+python 09_post_process.py ../problems/my_problem --rem-dup-tests
+```
+
+**Options:**
+- `--extract-meta` - Extract metadata from notebook and requirements.json
+- `--extract-problem` - Extract problem statement from notebook
+- `--extract-solution` - Extract solution from notebook
+- `--extract-standard` - Extract standard code from solution.md
+- `--rem-dup-tests` - Remove duplicate test cases based on find_test_cases search order
+- `--language {C++,Python,default}` - Programming language for standard code extraction
+- `--log-level LEVEL` - Set logging level (debug/info/warning/error/critical)
+- `--quiet` - Suppress output except errors
+
+**Test Case Priority Order (for duplicate removal):**
+1. `example_*.in` (highest priority)
+2. `test_[0-9]*.in` and `test_small_[0-9]*.in`
+3. `test_medium_[0-9]*.in`
+4. `test_large_[0-9]*.in`
+5. `test_edge_[0-9]*.in`
+6. `[0-9]*.in` (lowest priority)
+
 ### Typical Workflow
 
 1. Generate problem statement: `python 01_problem_statement.py`
